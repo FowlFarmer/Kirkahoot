@@ -18,68 +18,8 @@ export default function Home() {
   const [refreshAgo, setRefreshAgo] = useState("never");
   const [statusMessage, setStatusMessage] = useState("Enter a 7-digit PIN and nickname to start.");
   const [streamStatus, setStreamStatus] = useState("Disconnected");
-
-  const getElementDescriptor = (element: Element) => {
-    const htmlElement = element as HTMLElement;
-    const pathSegments: string[] = [];
-    let current: Element | null = element;
-
-    while (current && current.nodeType === 1) {
-      const tagName = current.tagName.toLowerCase();
-      const parent: Element | null = current.parentElement;
-      let selector = tagName;
-
-      if (current.id) {
-        selector += `#${current.id}`;
-      } else if (current.className) {
-        const classNames = String(current.className).split(/\s+/).filter(Boolean);
-        if (classNames.length > 0) {
-          selector += classNames.map((name) => `.${name}`).join("");
-        }
-      }
-
-      if (parent) {
-        const currentElement = current;
-        const siblings = Array.from(parent.children).filter(
-          (child): child is Element => child instanceof Element && child.tagName === currentElement.tagName
-        );
-        if (siblings.length > 1) {
-          selector += `:nth-of-type(${siblings.indexOf(currentElement) + 1})`;
-        }
-      }
-
-      pathSegments.unshift(selector);
-      current = parent;
-    }
-
-    return {
-      tagName: element.tagName.toLowerCase(),
-      id: htmlElement.id || undefined,
-      className: htmlElement.className || undefined,
-      name: htmlElement.getAttribute("name") || undefined,
-      role: htmlElement.getAttribute("role") || undefined,
-      type: (htmlElement.getAttribute("type") || undefined),
-      text: htmlElement.textContent?.trim().slice(0, 100) || undefined,
-      value: (htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLTextAreaElement)
-        ? htmlElement.value
-        : undefined,
-      path: pathSegments.join(" > "),
-    };
-  };
-
-  const sendElementAction = (action: string, element: Element, value?: string) => {
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-
-    const descriptor = getElementDescriptor(element);
-    socketRef.current.send(
-      JSON.stringify({
-        type: "element-action",
-        action,
-        descriptor,
-        value,
-      })
-    );
-  };
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -115,85 +55,100 @@ export default function Home() {
     };
   }, []);
 
+  const morphNode = (from: Node, to: Node) => {
+    if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) {
+      if (typeof (from as any).replaceWith === "function") {
+        (from as any).replaceWith(to.cloneNode(true));
+      } else if (from.parentNode) {
+        from.parentNode.replaceChild(to.cloneNode(true), from);
+      }
+      return;
+    }
+
+    if (from.nodeType === Node.TEXT_NODE || from.nodeType === Node.COMMENT_NODE) {
+      if (from.nodeValue !== to.nodeValue) {
+        from.nodeValue = to.nodeValue;
+      }
+      return;
+    }
+
+    if (from instanceof Element && to instanceof Element) {
+      const fromAttributes = Array.from(from.attributes).map((attr) => attr.name);
+      const toAttributes = Array.from(to.attributes).map((attr) => attr.name);
+
+      for (const name of toAttributes) {
+        const value = to.getAttribute(name);
+        if (value !== from.getAttribute(name)) {
+          from.setAttribute(name, value ?? "");
+        }
+      }
+      for (const name of fromAttributes) {
+        if (!to.hasAttribute(name)) {
+          from.removeAttribute(name);
+        }
+      }
+    }
+
+    const fromChildren = Array.from(from.childNodes);
+    const toChildren = Array.from(to.childNodes);
+    const length = Math.max(fromChildren.length, toChildren.length);
+
+    for (let i = 0; i < length; i++) {
+      const existingChild = fromChildren[i];
+      const nextChild = toChildren[i];
+
+      if (!existingChild && nextChild) {
+        from.appendChild(nextChild.cloneNode(true));
+        continue;
+      }
+
+      if (existingChild && !nextChild) {
+        existingChild.remove();
+        continue;
+      }
+
+      if (existingChild && nextChild) {
+        morphNode(existingChild, nextChild);
+      }
+    }
+  };
+
+  const updateIframeDocument = (iframe: HTMLIFrameElement, html: string) => {
+    const parser = new DOMParser();
+    const newDoc = parser.parseFromString(html, "text/html");
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc || !newDoc.documentElement) return;
+
+    if (!doc.body || !doc.head) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+      return;
+    }
+
+    if (newDoc.title) {
+      doc.title = newDoc.title;
+    }
+
+    if (doc.head && newDoc.head) {
+      doc.head.innerHTML = newDoc.head.innerHTML;
+    }
+
+    if (doc.body && newDoc.body) {
+      morphNode(doc.body, newDoc.body);
+    }
+  };
+
   useEffect(() => {
     const iframe = streamIframeRef.current;
-    if (!iframe) return;
+    if (!iframe || !streamHtml) return;
 
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      const actionable =
-        target.closest("button, a, input, textarea, select, label, [role='button'], [role='link']") || target;
-      event.preventDefault();
-      event.stopPropagation();
-      if (actionable) {
-        sendElementAction("click", actionable);
-      }
-    };
-
-    const handleInput = (event: Event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-        sendElementAction("type", target, target.value);
-      }
-    };
-
-    const handleChange = (event: Event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        sendElementAction("type", target, target.value);
-      }
-    };
-
-    const handleSubmit = (event: Event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      event.preventDefault();
-      event.stopPropagation();
-      sendElementAction("submit", target);
-    };
-
-    const attachHandlers = () => {
-      try {
-        const doc = iframe.contentDocument;
-        if (doc) {
-          doc.addEventListener("click", handleClick, true);
-          doc.addEventListener("input", handleInput, true);
-          doc.addEventListener("change", handleChange, true);
-          doc.addEventListener("submit", handleSubmit, true);
-        }
-      } catch (error) {
-        console.warn("Unable to attach iframe interaction handlers", error);
-      }
-    };
-
-    iframe.addEventListener("load", attachHandlers);
-    attachHandlers();
-
-    return () => {
-      iframe.removeEventListener("load", attachHandlers);
-      try {
-        const doc = iframe.contentDocument;
-        if (doc) {
-          doc.removeEventListener("click", handleClick, true);
-          doc.removeEventListener("input", handleInput, true);
-          doc.removeEventListener("change", handleChange, true);
-          doc.removeEventListener("submit", handleSubmit, true);
-        }
-      } catch {}
-    };
+    try {
+      updateIframeDocument(iframe, streamHtml);
+    } catch (error) {
+      console.warn("Unable to update iframe content", error);
+    }
   }, [streamHtml]);
-
 
   useEffect(() => {
     if (lastRefresh === null) {
@@ -254,7 +209,12 @@ export default function Home() {
       if (data.type === "error") {
         setConnecting(false);
         setStreamStatus("Error");
-        setStatusMessage(data.message || "Session error.");
+        const message =
+          data.message ||
+          "Unable to join the game. Make sure your nickname is not taken and the PIN is correct.";
+        setStatusMessage(message);
+        setErrorMessage(message);
+        setShowErrorPopup(true);
         socket.close();
       }
     });
@@ -368,7 +328,6 @@ export default function Home() {
                   <iframe
                     ref={streamIframeRef}
                     title="Kahoot static stream"
-                    srcDoc={streamHtml}
                     className="h-[520px] w-full min-w-[320px] bg-white"
                     sandbox="allow-same-origin"
                   />
@@ -383,6 +342,22 @@ export default function Home() {
 
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{statusMessage}</p>
         </div>
+
+        {showErrorPopup && errorMessage ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-3xl border border-red-300 bg-white p-6 shadow-2xl shadow-red-200/50 dark:border-red-700 dark:bg-zinc-950 dark:text-white">
+              <h2 className="text-lg font-semibold text-red-700 dark:text-red-300">Connection Error</h2>
+              <p className="mt-4 text-sm text-zinc-700 dark:text-zinc-300">{errorMessage}</p>
+              <button
+                type="button"
+                onClick={() => setShowErrorPopup(false)}
+                className="mt-6 inline-flex rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">

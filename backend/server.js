@@ -174,8 +174,27 @@ const createSession = async (socket, pin, nickname) => {
     } else {
       await sleep(2000);
     }
+
+    const confirmationText = "You're in! See your nickname on screen?";
+    const confirmationFound = await (typeof page.waitForFunction === "function"
+      ? page
+          .waitForFunction(
+            (text) => document.body?.innerText?.includes(text),
+            { timeout: 3000 },
+            confirmationText
+          )
+          .then(() => true)
+          .catch(() => false)
+      : page
+          .evaluate((text) => document.body?.innerText?.includes(text), confirmationText)
+          .catch(() => false));
+
+    if (!confirmationFound) {
+      throw new Error(`Nickname confirmation text not detected within 2 seconds: ${confirmationText}`);
+    }
   } catch (err) {
     warn("Nickname form automation failed:", err);
+    throw err;
   }
 
   log("Page ready for session", pin, nickname);
@@ -335,7 +354,13 @@ wss.on("connection", (socket) => {
           log("Session created", session.id, pin, nickname);
         } catch (error) {
           errorLog("Failed to create session:", error);
-          socket.send(JSON.stringify({ type: "status", message: "session error" }));
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message:
+                "Unable to join the game. Make sure your nickname is not taken or previously entered in this session, and that the game PIN is correct.",
+            })
+          );
           socket.close();
           return;
         }
