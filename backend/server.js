@@ -201,6 +201,7 @@ const createSession = async (socket, pin, nickname) => {
 
   let latestSnapshot = "";
   let previousSnapshot = "";
+  let previousAnswerPhase = false;
 
   const captureSnapshot = async () => {
     if (!page || (typeof page.isClosed === "function" && page.isClosed())) {
@@ -219,13 +220,43 @@ const createSession = async (socket, pin, nickname) => {
     }
   };
 
+  const detectAnswerPhase = async () => {
+    try {
+      return await page.evaluate(() => {
+        const labels = [
+          "blue diamond",
+          "red triangle",
+          "yellow circle",
+          "green square",
+        ];
+        const elements = Array.from(document.querySelectorAll("button, span, div"));
+        return elements.some((element) => {
+          const text = element.textContent?.trim().toLowerCase();
+          return text ? labels.some((label) => text.includes(label)) : false;
+        });
+      });
+    } catch (error) {
+      warn("Answer phase detection failed:", error);
+      return false;
+    }
+  };
+
   const sendSnapshot = async (force = false) => {
     const snapshot = await captureSnapshot();
     if (!snapshot) return;
-    if (!force && snapshot === previousSnapshot) return;
+    const answerPhase = await detectAnswerPhase();
+    if (!force && snapshot === previousSnapshot && answerPhase === previousAnswerPhase) return;
     previousSnapshot = snapshot;
+    previousAnswerPhase = answerPhase;
     if (socket.readyState === 1) {
-      socket.send(JSON.stringify({ type: "snapshot", html: snapshot, timestamp: Date.now() }));
+      socket.send(
+        JSON.stringify({
+          type: "snapshot",
+          html: snapshot,
+          timestamp: Date.now(),
+          answerPhase,
+        })
+      );
     }
   };
 
@@ -358,7 +389,7 @@ wss.on("connection", (socket) => {
             JSON.stringify({
               type: "error",
               message:
-                "Unable to join the game. Make sure your nickname is not taken or previously entered in this session, and that the game PIN is correct.",
+                "Unable to join the game. Make sure your nickname is not taken, profane, or previously entered in this session, and that the game PIN is correct.",
             })
           );
           socket.close();

@@ -18,6 +18,7 @@ export default function Home() {
   const [refreshAgo, setRefreshAgo] = useState("never");
   const [statusMessage, setStatusMessage] = useState("Enter a 7-digit PIN and nickname to start.");
   const [streamStatus, setStreamStatus] = useState("Disconnected");
+  const [answeringPhase, setAnsweringPhase] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
@@ -196,6 +197,7 @@ export default function Home() {
       if (data.type === "snapshot" && typeof data.html === "string") {
         setStreamHtml(data.html);
         setLastRefresh(Date.now());
+        setAnsweringPhase(Boolean(data.answerPhase));
       }
       if (data.type === "status") {
         setStreamStatus(data.message || "Connected");
@@ -211,7 +213,7 @@ export default function Home() {
         setStreamStatus("Error");
         const message =
           data.message ||
-          "Unable to join the game. Make sure your nickname is not taken and the PIN is correct.";
+          "Unable to join the game. Make sure your nickname is not taken, profane, or previously entered in this session, and the PIN is correct.";
         setStatusMessage(message);
         setErrorMessage(message);
         setShowErrorPopup(true);
@@ -315,6 +317,9 @@ export default function Home() {
                 <p className="mt-2 text-sm">Session ID: {sessionId}</p>
                 <p className="mt-2 text-sm">PIN: {pin}</p>
                 <p className="mt-2 text-sm">Nickname: {nickname}</p>
+                <p className={`mt-2 text-sm ${answeringPhase ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
+                  {answeringPhase ? "Answering phase" : "Not in answering phase"}
+                </p>
                 <button
                   type="button"
                   onClick={handleDisconnect}
