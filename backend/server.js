@@ -153,6 +153,8 @@ const createSession = async (socket, pin, nickname) => {
     await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
   }
 
+  let nicknameConfirmed = true;
+
   try {
     log("Waiting before nickname entry");
     await sleep(690);
@@ -175,22 +177,30 @@ const createSession = async (socket, pin, nickname) => {
       await sleep(2000);
     }
 
-    const confirmationText = "You're in! See your nickname on screen?";
+    const confirmationTexts = [
+      "You're in! See your nickname on screen?",
+      "You'll be able to join soon",
+    ];
     const confirmationFound = await (typeof page.waitForFunction === "function"
       ? page
           .waitForFunction(
-            (text) => document.body?.innerText?.includes(text),
+            (texts) =>
+              texts.some((text) => document.body?.innerText?.includes(text)),
             { timeout: 3000 },
-            confirmationText
+            confirmationTexts
           )
           .then(() => true)
           .catch(() => false)
       : page
-          .evaluate((text) => document.body?.innerText?.includes(text), confirmationText)
+          .evaluate(
+            (texts) => texts.some((text) => document.body?.innerText?.includes(text)),
+            confirmationTexts
+          )
           .catch(() => false));
 
     if (!confirmationFound) {
-      throw new Error(`Nickname confirmation text not detected within 2 seconds: ${confirmationText}`);
+      nicknameConfirmed = false;
+      warn(`Nickname confirmation text not detected: ${confirmationTexts.join(" | ")}`);
     }
   } catch (err) {
     warn("Nickname form automation failed:", err);
@@ -201,7 +211,6 @@ const createSession = async (socket, pin, nickname) => {
 
   let latestSnapshot = "";
   let previousSnapshot = "";
-  let previousAnswerPhase = false;
 
   const captureSnapshot = async () => {
     if (!page || (typeof page.isClosed === "function" && page.isClosed())) {
@@ -220,41 +229,17 @@ const createSession = async (socket, pin, nickname) => {
     }
   };
 
-  const detectAnswerPhase = async () => {
-    try {
-      return await page.evaluate(() => {
-        const labels = [
-          "blue diamond",
-          "red triangle",
-          "yellow circle",
-          "green square",
-        ];
-        const elements = Array.from(document.querySelectorAll("button, span, div"));
-        return elements.some((element) => {
-          const text = element.textContent?.trim().toLowerCase();
-          return text ? labels.some((label) => text.includes(label)) : false;
-        });
-      });
-    } catch (error) {
-      warn("Answer phase detection failed:", error);
-      return false;
-    }
-  };
-
   const sendSnapshot = async (force = false) => {
     const snapshot = await captureSnapshot();
     if (!snapshot) return;
-    const answerPhase = await detectAnswerPhase();
-    if (!force && snapshot === previousSnapshot && answerPhase === previousAnswerPhase) return;
+    if (!force && snapshot === previousSnapshot) return;
     previousSnapshot = snapshot;
-    previousAnswerPhase = answerPhase;
     if (socket.readyState === 1) {
       socket.send(
         JSON.stringify({
           type: "snapshot",
           html: snapshot,
           timestamp: Date.now(),
-          answerPhase,
         })
       );
     }
@@ -270,8 +255,25 @@ const createSession = async (socket, pin, nickname) => {
     await sendSnapshot();
   });
 
+  const sessionId = createSessionId();
+  const hardTimeout = setTimeout(async () => {
+    log("Session hard timeout reached", sessionId, pin, nickname);
+    if (socket.readyState === 1) {
+      socket.send(
+        JSON.stringify({
+          type: "status",
+          message: "Session timed out after 1 hour and will be closed.",
+        })
+      );
+      socket.close();
+    }
+    await cleanupSession(sessionId).catch((err) =>
+      warn("Hard timeout cleanup failed", sessionId, err)
+    );
+  }, 3600_000);
+
   return {
-    id: createSessionId(),
+    id: sessionId,
     socket,
     pin,
     nickname,
@@ -280,7 +282,9 @@ const createSession = async (socket, pin, nickname) => {
     captureSnapshot,
     sendSnapshot,
     interval,
+    hardTimeout,
     latestSnapshot,
+    nicknameConfirmed,
   };
 };
 
@@ -288,6 +292,7 @@ const cleanupSession = async (sessionId) => {
   const session = sessions.get(sessionId);
   if (!session) return;
   clearInterval(session.interval);
+  clearTimeout(session.hardTimeout);
   try {
     log("Cleaning up session", sessionId);
     if (session.page && typeof session.page.close === "function") {
@@ -394,6 +399,16 @@ wss.on("connection", (socket) => {
           );
           socket.close();
           return;
+        }
+
+        if (session && session.nicknameConfirmed === false) {
+          socket.send(
+            JSON.stringify({
+              type: "warning",
+              message:
+                "Nickname confirmation was not detected. The backend is still streaming the page, but the join may not have completed successfully.",
+            })
+          );
         }
 
         socket.send(JSON.stringify({ type: "status", message: "connected" }));

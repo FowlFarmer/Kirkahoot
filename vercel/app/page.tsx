@@ -140,12 +140,30 @@ export default function Home() {
     }
   };
 
+  const detectAnswerPhaseFromIframe = (iframe: HTMLIFrameElement | null) => {
+    if (!iframe) return false;
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) return false;
+
+    const labels = ["triangle", "circle", "square", "diamond"];
+    const elements = Array.from(doc.querySelectorAll("button, span, div, p, a, li"));
+
+    return elements.some((element) => {
+      const text = element.textContent?.trim().toLowerCase();
+      return text ? labels.some((label) => text.includes(label)) : false;
+    });
+  };
+
   useEffect(() => {
     const iframe = streamIframeRef.current;
-    if (!iframe || !streamHtml) return;
+    if (!iframe || !streamHtml) {
+      setAnsweringPhase(false);
+      return;
+    }
 
     try {
       updateIframeDocument(iframe, streamHtml);
+      setAnsweringPhase(detectAnswerPhaseFromIframe(iframe));
     } catch (error) {
       console.warn("Unable to update iframe content", error);
     }
@@ -197,7 +215,6 @@ export default function Home() {
       if (data.type === "snapshot" && typeof data.html === "string") {
         setStreamHtml(data.html);
         setLastRefresh(Date.now());
-        setAnsweringPhase(Boolean(data.answerPhase));
       }
       if (data.type === "status") {
         setStreamStatus(data.message || "Connected");
@@ -207,6 +224,15 @@ export default function Home() {
         setConnected(true);
         setConnecting(false);
         setStatusMessage(`Streaming pin ${data.pin} as ${data.nickname}.`);
+      }
+      if (data.type === "warning") {
+        setStreamStatus("Warning");
+        const message =
+          data.message ||
+          "Nickname confirmation was not detected; preview is streaming but the join may not be complete.";
+        setStatusMessage(message);
+        setErrorMessage(message);
+        setShowErrorPopup(true);
       }
       if (data.type === "error") {
         setConnecting(false);
@@ -255,6 +281,7 @@ export default function Home() {
     setConnecting(false);
     setSessionId(null);
     setStreamHtml("");
+    setAnsweringPhase(false);
     setStatusMessage("Disconnected.");
     setStreamStatus("Disconnected");
   };
@@ -333,7 +360,8 @@ export default function Home() {
                   <iframe
                     ref={streamIframeRef}
                     title="Kahoot static stream"
-                    className="h-[520px] w-full min-w-[320px] bg-white"
+                    className="h-[520px] w-full min-w-[320px] bg-white opacity-95"
+                    style={{ filter: "grayscale(0.08)" }}
                     sandbox="allow-same-origin"
                   />
                 ) : (
