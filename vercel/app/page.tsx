@@ -458,7 +458,7 @@ export default function Home() {
 
         <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <span>Camera Preview</span>
+            <span>Charlie Kirk's eyeballz</span>
             <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-900/40 dark:text-green-200">
               {cameraActive ? "Active" : "Initializing"}
             </span>
