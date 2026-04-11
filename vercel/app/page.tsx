@@ -37,23 +37,48 @@ function ShapeIcon({ answer, color }: { answer: KahootAnswer; color: string }) {
   return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><rect x="2" y="2" width="24" height="24" fill={color} /></svg>;
 }
 
-function AnswerCard({ inferring, result, answeringPhase }: { inferring: boolean; result: string | null; answeringPhase: boolean }) {
-  if (!answeringPhase && !inferring && !result) {
+function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; result: string | null; gamePhase: string }) {
+  const isGray = gamePhase === "waiting" && !inferring;
+
+  if (isGray) {
     return (
       <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Gemma answer</p>
-        <p className="text-zinc-400 dark:text-zinc-500">Waiting for answering phase…</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Charlie Kirk&apos;s Response</p>
+        <p className="text-zinc-400 dark:text-zinc-500">
+          {result ? result : "Charlie Kirk is waiting for the question…"}
+        </p>
       </div>
     );
   }
   if (inferring) {
     return (
       <div className="rounded-3xl border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Gemma answer</p>
-        <p>Analyzing…</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
+        <p>Charlie Kirk is thinking…</p>
       </div>
     );
   }
+
+  if (gamePhase === "correct") {
+    return (
+      <div className="rounded-3xl border border-emerald-400 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
+        <p className="text-lg font-bold">✓ Correct!</p>
+        {result && <p className="mt-1 leading-relaxed opacity-80">{result}</p>}
+      </div>
+    );
+  }
+
+  if (gamePhase === "incorrect") {
+    return (
+      <div className="rounded-3xl border border-red-400 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-600 dark:bg-red-950/40 dark:text-red-200">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
+        <p className="text-lg font-bold">✗ Wrong!</p>
+        {result && <p className="mt-1 leading-relaxed opacity-80">{result}</p>}
+      </div>
+    );
+  }
+
   if (!result) return null;
 
   const answer = parseAnswer(result);
@@ -65,7 +90,7 @@ function AnswerCard({ inferring, result, answeringPhase }: { inferring: boolean;
         ? `${styles.border} ${styles.bg} ${styles.text}`
         : "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
     }`}>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-60">Gemma answer</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
       <div className="flex items-start gap-3">
         {answer && <ShapeIcon answer={answer} color={styles!.iconColor} />}
         <p className="leading-relaxed">{result}</p>
@@ -82,22 +107,20 @@ export default function Home() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [pin, setPin] = useState("");
-  const [nickname, setNickname] = useState("");
-  const streamIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [connectedNickname, setConnectedNickname] = useState<string | null>(null);
+  const kahootIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [streamHtml, setStreamHtml] = useState<string>("");
-  const [lastRefresh, setLastRefresh] = useState<number | null>(null);
-  const [refreshAgo, setRefreshAgo] = useState("never");
-  const [statusMessage, setStatusMessage] = useState("Enter a 7-digit PIN and nickname to start.");
+  const sessionIdRef = useRef<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("Enter a 7-digit PIN to start.");
   const [streamStatus, setStreamStatus] = useState("Disconnected");
-  const [answeringPhase, setAnsweringPhase] = useState(false);
-  const prevAnsweringPhaseRef = useRef(false);
+  const [gamePhase, setGamePhase] = useState<"waiting"|"answering"|"correct"|"incorrect">("waiting");
+  const prevPhaseRef = useRef<string>("waiting");
   const answerSentRef = useRef(false);
   const [inferenceResult, setInferenceResult] = useState<string | null>(null);
   const [inferring, setInferring] = useState(false);
-  const [autoSubmit, setAutoSubmit] = useState(true);
+  const [cameraZoom, setCameraZoom] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
@@ -135,194 +158,17 @@ export default function Home() {
     };
   }, []);
 
-  const morphNode = (from: Node, to: Node) => {
-    if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) {
-      if (typeof (from as any).replaceWith === "function") {
-        (from as any).replaceWith(to.cloneNode(true));
-      } else if (from.parentNode) {
-        from.parentNode.replaceChild(to.cloneNode(true), from);
-      }
-      return;
-    }
-
-    if (from.nodeType === Node.TEXT_NODE || from.nodeType === Node.COMMENT_NODE) {
-      if (from.nodeValue !== to.nodeValue) {
-        from.nodeValue = to.nodeValue;
-      }
-      return;
-    }
-
-    if (from instanceof Element && to instanceof Element) {
-      const fromAttributes = Array.from(from.attributes).map((attr) => attr.name);
-      const toAttributes = Array.from(to.attributes).map((attr) => attr.name);
-
-      for (const name of toAttributes) {
-        const value = to.getAttribute(name);
-        if (value !== from.getAttribute(name)) {
-          from.setAttribute(name, value ?? "");
-        }
-      }
-      for (const name of fromAttributes) {
-        if (!to.hasAttribute(name)) {
-          from.removeAttribute(name);
-        }
-      }
-    }
-
-    const fromChildren = Array.from(from.childNodes);
-    const toChildren = Array.from(to.childNodes);
-    const length = Math.max(fromChildren.length, toChildren.length);
-
-    for (let i = 0; i < length; i++) {
-      const existingChild = fromChildren[i];
-      const nextChild = toChildren[i];
-
-      if (!existingChild && nextChild) {
-        from.appendChild(nextChild.cloneNode(true));
-        continue;
-      }
-
-      if (existingChild && !nextChild) {
-        existingChild.remove();
-        continue;
-      }
-
-      if (existingChild && nextChild) {
-        morphNode(existingChild, nextChild);
-      }
-    }
-  };
-
-  const updateIframeDocument = (iframe: HTMLIFrameElement, html: string) => {
-    const parser = new DOMParser();
-    const newDoc = parser.parseFromString(html, "text/html");
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc || !newDoc.documentElement) return;
-
-    if (!doc.body || !doc.head) {
-      doc.open();
-      doc.write(html);
-      doc.close();
-      return;
-    }
-
-    if (newDoc.title) {
-      doc.title = newDoc.title;
-    }
-
-    if (doc.head && newDoc.head) {
-      doc.head.innerHTML = newDoc.head.innerHTML;
-    }
-
-    if (doc.body && newDoc.body) {
-      morphNode(doc.body, newDoc.body);
-    }
-  };
-
-  const detectAnswerPhaseFromIframe = (iframe: HTMLIFrameElement | null) => {
-    if (!iframe) return false;
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc) return false;
-
-    const labels = ["triangle", "circle", "square", "diamond"];
-    const elements = Array.from(doc.querySelectorAll("button, span, div, p, a, li"));
-
-    return elements.some((element) => {
-      const text = element.textContent?.trim().toLowerCase();
-      return text ? labels.some((label) => text.includes(label)) : false;
-    });
-  };
-
-  useEffect(() => {
-    const iframe = streamIframeRef.current;
-    if (!iframe || !streamHtml) {
-      setAnsweringPhase(false);
-      return;
-    }
-
-    try {
-      updateIframeDocument(iframe, streamHtml);
-      const nowAnswering = detectAnswerPhaseFromIframe(iframe);
-      if (nowAnswering && !prevAnsweringPhaseRef.current) {
-        answerSentRef.current = false;
-        captureAndInfer();
-      }
-      prevAnsweringPhaseRef.current = nowAnswering;
-      setAnsweringPhase(nowAnswering);
-    } catch (error) {
-      console.warn("Unable to update iframe content", error);
-    }
-  }, [streamHtml]);
-
-  // Listen for clicks inside the sandboxed iframe and forward matching shapes to the backend
-  useEffect(() => {
-    const iframe = streamIframeRef.current;
-    if (!iframe) return;
-
-    const SHAPE_LABELS = ["triangle", "circle", "square", "diamond"];
-
-    const handleIframeClick = (event: MouseEvent) => {
-      if (!answeringPhase) return;
-      const target = event.target as Element | null;
-      if (!target) return;
-
-      // Walk up from the click target to find a button with a recognizable shape label
-      let el: Element | null = target;
-      while (el) {
-        const text = el.textContent?.toLowerCase() ?? "";
-        const shape = SHAPE_LABELS.find((s) => text.includes(s));
-        if (shape && (el.tagName === "BUTTON" || el.getAttribute("role") === "button")) {
-          sendClickAnswer(shape);
-          break;
-        }
-        el = el.parentElement;
-      }
-    };
-
-    const attachListener = () => {
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.addEventListener("click", handleIframeClick, true);
-      }
-    };
-
-    // Attach now and re-attach whenever the iframe loads
-    attachListener();
-    iframe.addEventListener("load", attachListener);
-
-    return () => {
-      iframe.removeEventListener("load", attachListener);
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) doc.removeEventListener("click", handleIframeClick, true);
-    };
-  }, [answeringPhase, sessionId]);
-
-  useEffect(() => {
-    if (lastRefresh === null) {
-      setRefreshAgo("never");
-      return;
-    }
-
-    const updateAgo = () => {
-      const seconds = Math.max(0, Math.floor((Date.now() - lastRefresh) / 1000));
-      setRefreshAgo(`${seconds}s ago`);
-    };
-
-    updateAgo();
-    const interval = window.setInterval(updateAgo, 1000);
-    return () => window.clearInterval(interval);
-  }, [lastRefresh]);
-
   const sendClickAnswer = (shape: string) => {
-    const sid = sessionId;
-    if (!sid) return;
-    if (answerSentRef.current) return;
+    const sid = sessionIdRef.current;
+    if (!sid) { console.warn("[kirk] sendClickAnswer: no sessionId"); return; }
+    if (answerSentRef.current) { console.warn("[kirk] sendClickAnswer: already sent this phase, skipping", shape); return; }
     answerSentRef.current = true;
+    console.log("[kirk] sendClickAnswer:", shape);
     fetch("http://localhost:3001/click-answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId: sid, shape }),
-    }).catch(() => {});
+    }).catch((e) => console.error("[kirk] click-answer fetch failed", e));
   };
 
   const captureAndInfer = async () => {
@@ -330,11 +176,18 @@ export default function Home() {
     if (!video || video.readyState < 2) return;
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    // Center-crop by zoom factor so the output resolution stays constant
+    const srcW = vw / cameraZoom;
+    const srcH = vh / cameraZoom;
+    const srcX = (vw - srcW) / 2;
+    const srcY = (vh - srcH) / 2;
+    canvas.width = vw;
+    canvas.height = vh;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
 
     // Compress to JPEG, reducing quality until decoded size <= 80 KB
     const MAX_BYTES = 80 * 1024;
@@ -355,7 +208,7 @@ export default function Home() {
     setInferring(true);
     setInferenceResult(null);
 
-    const callGemini = async (imageBase64: string): Promise<string> => {
+    const callCharlie = async (imageBase64: string): Promise<string> => {
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -366,7 +219,7 @@ export default function Home() {
     };
 
     try {
-      let text = await callGemini(base64);
+      let text = await callCharlie(base64);
       let answer = parseAnswer(text);
 
       // Dev-only fallback: retry with the test image if no valid answer detected
@@ -374,7 +227,7 @@ export default function Home() {
         const testResp = await fetch("/test_endpoint1.jpg");
         const testBuffer = await testResp.arrayBuffer();
         const testBase64 = btoa(String.fromCharCode(...new Uint8Array(testBuffer)));
-        text = await callGemini(testBase64);
+        text = await callCharlie(testBase64);
         answer = parseAnswer(text);
         if (answer) text = `[dev fallback] ${text}`;
       }
@@ -382,7 +235,7 @@ export default function Home() {
       setInferenceResult(text);
 
       // Auto-click the matching answer button on the backend
-      if (answer && autoSubmit) {
+      if (answer) {
         const shapeWord = answer.split(" ")[1].toLowerCase(); // e.g. "diamond"
         sendClickAnswer(shapeWord);
       }
@@ -401,17 +254,13 @@ export default function Home() {
       setStatusMessage("PIN must be exactly 7 digits.");
       return;
     }
-    if (!nickname.trim()) {
-      setStatusMessage("Nickname is required.");
-      return;
-    }
 
     setConnecting(true);
     setStreamStatus("Connecting");
     setStatusMessage("Attempting to connect to the Kahoot game...");
     setInferenceResult(null);
     setInferring(false);
-    prevAnsweringPhaseRef.current = false;
+    prevPhaseRef.current = "waiting";
     answerSentRef.current = false;
 
     const socket = new WebSocket("ws://localhost:3001/ws");
@@ -419,23 +268,30 @@ export default function Home() {
 
     socket.addEventListener("open", () => {
       setStreamStatus("Connected");
-      socket.send(JSON.stringify({ type: "init", pin, nickname }));
+      socket.send(JSON.stringify({ type: "init", pin }));
     });
 
     socket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "snapshot" && typeof data.html === "string") {
-        setStreamHtml(data.html);
-        setLastRefresh(Date.now());
+      if (data.type === "phase") {
+        const nowPhase: string = data.phase ?? "waiting";
+        if (nowPhase === "answering" && prevPhaseRef.current !== "answering") {
+          answerSentRef.current = false;
+          captureAndInfer();
+        }
+        prevPhaseRef.current = nowPhase;
+        setGamePhase(nowPhase as "waiting"|"answering"|"correct"|"incorrect");
       }
       if (data.type === "status") {
         setStreamStatus(data.message || "Connected");
       }
       if (data.type === "session") {
         setSessionId(data.sessionId);
+        sessionIdRef.current = data.sessionId;
+        setConnectedNickname(data.nickname ?? null);
         setConnected(true);
         setConnecting(false);
-        setStatusMessage(`Streaming pin ${data.pin} as ${data.nickname}.`);
+        setStatusMessage(`Charlie Kirk joined as ${data.nickname}.`);
       }
       if (data.type === "warning") {
         setStreamStatus("Warning");
@@ -449,9 +305,7 @@ export default function Home() {
       if (data.type === "error") {
         setConnecting(false);
         setStreamStatus("Error");
-        const message =
-          data.message ||
-          "Unable to join the game. Make sure your nickname is not taken, profane, or previously entered in this session, and the PIN is correct.";
+        const message = data.message || "charlie kirk died :( rip";
         setStatusMessage(message);
         setErrorMessage(message);
         setShowErrorPopup(true);
@@ -462,13 +316,19 @@ export default function Home() {
     socket.addEventListener("close", () => {
       setStreamStatus("Disconnected");
       setConnecting(false);
-      if (!connected) {
-        setStatusMessage("Connection failed. Please try again.");
-      } else {
-        setStatusMessage("Disconnected from backend.");
-      }
-      setConnected(false);
+      setConnected((wasConnected) => {
+        if (wasConnected) {
+          setStatusMessage("Disconnected from backend.");
+        } else {
+          setStatusMessage("Connection failed. Please try again.");
+        }
+        return false;
+      });
       setSessionId(null);
+      sessionIdRef.current = null;
+      setConnectedNickname(null);
+      setGamePhase("waiting");
+      prevPhaseRef.current = "waiting";
       if (socketRef.current === socket) {
         socketRef.current = null;
       }
@@ -492,9 +352,10 @@ export default function Home() {
     setConnected(false);
     setConnecting(false);
     setSessionId(null);
-    setStreamHtml("");
-    setAnsweringPhase(false);
-    prevAnsweringPhaseRef.current = false;
+    sessionIdRef.current = null;
+    setConnectedNickname(null);
+    setGamePhase("waiting");
+    prevPhaseRef.current = "waiting";
     answerSentRef.current = false;
     setInferenceResult(null);
     setInferring(false);
@@ -505,82 +366,52 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-zinc-100 px-4 py-12 text-black dark:bg-zinc-950 dark:text-white">
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-8">
+
+        {/* Charlie Kirk's Den */}
         <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <div className="flex flex-col gap-1">
-              <span>Kahoot Static Stream</span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">Last refresh: {lastRefresh === null ? "never" : refreshAgo}</span>
-            </div>
+            <span>Charlie Kirk&apos;s Den</span>
             <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
               {streamStatus}
             </span>
           </div>
 
           {!connected ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
-                Game PIN
-                <input
-                  inputMode="numeric"
-                  maxLength={7}
-                  value={pin}
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
-                  className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-                  placeholder="e.g. 4124500"
-                />
-              </label>
-              <label className="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
-                Nickname
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(event) => setNickname(event.target.value)}
-                  className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-                  placeholder="Your nickname"
-                />
-              </label>
-              <div className="md:col-span-2 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleConnect}
-                  disabled={connecting || connected}
-                  className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {connecting ? "Connecting..." : "Start Kahoot Stream"}
-                </button>
-                <p className="self-center text-sm text-zinc-600 dark:text-zinc-400">
-                  Enter a valid 7-digit PIN and nickname, then connect.
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                inputMode="numeric"
+                maxLength={7}
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
+                className="w-48 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                placeholder="Game PIN (7 digits)"
+              />
+              <button
+                type="button"
+                onClick={handleConnect}
+                disabled={connecting || connected}
+                className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {connecting ? "Connecting..." : "Oh LAWD he comin'!"}
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
                 <p className="font-medium">Connected session</p>
-                <p className="mt-2 text-sm">Session ID: {sessionId}</p>
                 <p className="mt-2 text-sm">PIN: {pin}</p>
-                <p className="mt-2 text-sm">Nickname: {nickname}</p>
-                <p className={`mt-2 text-sm ${answeringPhase ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
-                  {answeringPhase ? "Answering phase" : "Not in answering phase"}
+                <p className="mt-2 text-sm">Nickname: {connectedNickname ?? "—"}</p>
+                <p className={`mt-2 text-sm ${
+                  gamePhase === "answering" ? "text-emerald-700 dark:text-emerald-300" :
+                  gamePhase === "correct" ? "text-emerald-700 dark:text-emerald-300" :
+                  gamePhase === "incorrect" ? "text-red-700 dark:text-red-300" :
+                  "text-zinc-500 dark:text-zinc-400"
+                }`}>
+                  {gamePhase === "answering" ? "Answering phase" :
+                   gamePhase === "correct" ? "Correct!" :
+                   gamePhase === "incorrect" ? "Wrong!" :
+                   "Waiting"}
                 </p>
-                <label className="mt-3 flex cursor-pointer items-center gap-3">
-                  <span className="text-sm text-zinc-600 dark:text-zinc-400">Gemini auto-submit</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={autoSubmit}
-                    onClick={() => setAutoSubmit((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
-                      autoSubmit ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                        autoSubmit ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </label>
                 <button
                   type="button"
                   onClick={handleDisconnect}
@@ -589,26 +420,9 @@ export default function Home() {
                   Disconnect
                 </button>
               </div>
-              <AnswerCard inferring={inferring} result={inferenceResult} answeringPhase={answeringPhase} />
-              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
-                {streamHtml ? (
-                  <iframe
-                    ref={streamIframeRef}
-                    title="Kahoot static stream"
-                    className="h-[520px] w-full min-w-[320px] bg-white opacity-95"
-                    style={{ filter: "grayscale(0.08)" }}
-                    sandbox="allow-same-origin"
-                  />
-                ) : (
-                  <div className="flex h-[520px] items-center justify-center text-sm text-zinc-500 dark:text-zinc-400">
-                    Waiting for the static Kahoot snapshot...
-                  </div>
-                )}
-              </div>
+              <AnswerCard inferring={inferring} result={inferenceResult} gamePhase={gamePhase} />
             </div>
           )}
-
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{statusMessage}</p>
         </div>
 
         {showErrorPopup && errorMessage ? (
@@ -627,6 +441,21 @@ export default function Home() {
           </div>
         ) : null}
 
+        {/* Kahoot iframe — always visible */}
+        <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
+          <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            <span>Kahoot</span>
+          </div>
+          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
+            <iframe
+              ref={kahootIframeRef}
+              src="https://kahoot.it"
+              title="Kahoot"
+              className="h-[520px] w-full min-w-[320px] bg-white"
+            />
+          </div>
+        </div>
+
         <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
             <span>Camera Preview</span>
@@ -637,9 +466,22 @@ export default function Home() {
           <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
             <video
               ref={videoRef}
-              className="h-[320px] w-full object-cover"
+              className="h-[320px] w-full object-cover transition-transform duration-150"
+              style={{ transform: `scale(${cameraZoom})` }}
               playsInline
               muted
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 w-16 shrink-0">Zoom {cameraZoom.toFixed(1)}×</span>
+            <input
+              type="range"
+              min={1}
+              max={4}
+              step={0.1}
+              value={cameraZoom}
+              onChange={(e) => setCameraZoom(parseFloat(e.target.value))}
+              className="w-full accent-blue-600"
             />
           </div>
           {cameraError ? (

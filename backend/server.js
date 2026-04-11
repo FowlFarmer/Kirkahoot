@@ -11,133 +11,69 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   log("HTTP", req.method, req.url);
   next();
 });
+
+app.use(express.json());
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 const ENABLE_LOGS = process.env.ENABLE_BACKEND_LOGS === "true" || process.env.NODE_ENV !== "production";
 const prettyTime = () => new Date().toISOString();
-const log = (...args) => {
-  if (ENABLE_LOGS) console.log("[backend]", prettyTime(), ...args);
-};
-const warn = (...args) => {
-  if (ENABLE_LOGS) console.warn("[backend]", prettyTime(), ...args);
-};
-const errorLog = (...args) => {
-  if (ENABLE_LOGS) console.error("[backend]", prettyTime(), ...args);
-};
+const log = (...args) => { if (ENABLE_LOGS) console.log("[backend]", prettyTime(), ...args); };
+const warn = (...args) => { if (ENABLE_LOGS) console.warn("[backend]", prettyTime(), ...args); };
+const errorLog = (...args) => { if (ENABLE_LOGS) console.error("[backend]", prettyTime(), ...args); };
 
 let browser = null;
 const sessions = new Map();
 const MAX_ACTIVE_SESSIONS = Number(process.env.MAX_ACTIVE_SESSIONS) || 4;
 
 const startSessionCountLog = () => {
-  setInterval(() => {
-    log("Active backend sessions:", sessions.size);
-  }, 10000);
-};
-
-const sanitizeHtml = (html) => {
-  const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, "");
-  return withoutScripts.replace(
-    /<head([^>]*)>/i,
-    `<head$1><base href=\"https://kahoot.it\">`
-  );
+  setInterval(() => log("Active backend sessions:", sessions.size), 10000);
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const createSessionId = () => crypto.randomUUID();
 
-const performElementAction = async (page, action, descriptor, value) => {
-  const result = await page.evaluate(({ action, descriptor, value }) => {
-    const escapeCss = (str) =>
-      String(str).replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
-
-    const tryQuery = (selector) => {
-      try {
-        return document.querySelector(selector);
-      } catch {
-        return null;
-      }
-    };
-
-    const findElement = () => {
-      const selectors = [];
-      if (descriptor.selector) selectors.push(descriptor.selector);
-      if (descriptor.id) selectors.push(`#${escapeCss(descriptor.id)}`);
-      if (descriptor.name) selectors.push(`${descriptor.tagName || "*"}[name="${escapeCss(descriptor.name)}"]`);
-      if (descriptor.role) selectors.push(`${descriptor.tagName || "*"}[role="${escapeCss(descriptor.role)}"]`);
-      if (descriptor.className) {
-        const classes = String(descriptor.className).split(/\s+/).filter(Boolean);
-        if (classes.length) {
-          selectors.push(`${descriptor.tagName || "*"}${classes.map((name) => `.${escapeCss(name)}`).join("")}`);
-        }
-      }
-      if (descriptor.path) selectors.push(descriptor.path);
-
-      for (const selector of selectors) {
-        const element = tryQuery(selector);
-        if (element) return element;
-      }
-
-      if (descriptor.text) {
-        const searchText = String(descriptor.text).trim().toLowerCase();
-        const elements = Array.from(document.querySelectorAll(descriptor.tagName || "*"));
-        return elements.find((element) =>
-          element.textContent?.trim().toLowerCase().includes(searchText)
-        );
-      }
-
-      return null;
-    };
-
-    const element = findElement();
-    if (!element) {
-      return { success: false, message: "Element not found" };
-    }
-
-    if (action === "click") {
-      element.click();
-      return { success: true };
-    }
-
-    if (action === "submit") {
-      if (typeof element.submit === "function") {
-        element.submit();
-        return { success: true };
-      }
-      return { success: false, message: "Element cannot submit" };
-    }
-
-    if (action === "type") {
-      if ("value" in element) {
-        element.focus();
-        element.value = value || "";
-        element.dispatchEvent(new Event("input", { bubbles: true }));
-        return { success: true };
-      }
-      return { success: false, message: "Element is not typable" };
-    }
-
-    return { success: false, message: "Unsupported action" };
-  }, { action, descriptor, value });
-
-  return result;
+const generateNickname = () => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const suffix = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `CharlieKirk${suffix}`;
 };
 
-const createSession = async (socket, pin, nickname) => {
-  if (!browser) {
-    throw new Error("Browser is not initialized");
-  }
+const ANSWER_LABELS = ["triangle", "circle", "square", "diamond"];
 
+const CORRECT_PATH_FRAGMENT = "M46.244 15.355";
+const INCORRECT_PATH_FRAGMENT = "M39.99 12.621";
+
+const detectPhase = async (page) => {
+  try {
+    return await page.evaluate((labels, correctFrag, incorrectFrag) => {
+      const paths = Array.from(document.querySelectorAll("path"));
+      if (paths.some((p) => (p.getAttribute("d") || "").includes(correctFrag))) return "correct";
+      if (paths.some((p) => (p.getAttribute("d") || "").includes(incorrectFrag))) return "incorrect";
+      const elements = Array.from(document.querySelectorAll("button, span, div, p, a, li"));
+      if (elements.some((el) => {
+        const text = el.textContent?.trim().toLowerCase();
+        return text ? labels.some((label) => text.includes(label)) : false;
+      })) return "answering";
+      return "waiting";
+    }, labels, correctFrag, incorrectFrag);
+  } catch {
+    return "waiting";
+  }
+};
+
+const createSession = async (socket, pin) => {
+  if (!browser) throw new Error("Browser is not initialized");
+
+  const nickname = generateNickname();
   const url = `https://kahoot.it/?pin=${encodeURIComponent(pin)}&refer_method=link`;
   log("Creating session", pin, nickname);
+
   const context =
     typeof browser.createBrowserContext === "function"
       ? await browser.createBrowserContext()
@@ -145,165 +81,116 @@ const createSession = async (socket, pin, nickname) => {
       ? await browser.createIncognitoBrowserContext()
       : null;
   const page = context ? await context.newPage() : await browser.newPage();
-  log("Created page for session", pin, nickname, "using context?", !!context);
-  await page.setViewport({ width: 1280, height: 900 });
-  log("Navigating to", url);
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-  if (typeof page.waitForNetworkIdle === "function") {
-    log("Waiting for network idle");
-    await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
-  }
-
-  let nicknameConfirmed = true;
 
   try {
-    log("Waiting before nickname entry");
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    if (typeof page.waitForNetworkIdle === "function") {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+    }
+
     await sleep(690);
     const nicknameSelector = 'input[name="nickname"], #nickname, input[data-functional-selector="username-input"]';
     await page.waitForSelector(nicknameSelector, { timeout: 10000 });
     await page.type(nicknameSelector, nickname, { delay: 50 });
     log("Nickname typed", nickname);
 
-    log("Waiting before submit click");
     await sleep(670);
     const submitSelector = 'button[data-functional-selector="join-button-username"], button[type="submit"]';
     await page.waitForSelector(submitSelector, { timeout: 10000 });
     await page.click(submitSelector);
-    log("Clicked OK, go! button");
+    log("Clicked submit");
 
     if (typeof page.waitForNetworkIdle === "function") {
       await page.waitForNetworkIdle({ idleTime: 500, timeout: 2000 }).catch(() => null);
-      log("Network idle after submit");
     } else {
       await sleep(2000);
     }
 
-    const confirmationTexts = [
-      "You're in! See your nickname on screen?",
-      "You'll be able to join soon",
-    ];
+    const confirmationTexts = ["You're in! See your nickname on screen?", "You'll be able to join soon"];
     const confirmationFound = await (typeof page.waitForFunction === "function"
-      ? page
-          .waitForFunction(
-            (texts) =>
-              texts.some((text) => document.body?.innerText?.includes(text)),
-            { timeout: 3000 },
-            confirmationTexts
-          )
-          .then(() => true)
-          .catch(() => false)
-      : page
-          .evaluate(
-            (texts) => texts.some((text) => document.body?.innerText?.includes(text)),
-            confirmationTexts
-          )
-          .catch(() => false));
+      ? page.waitForFunction(
+          (texts) => texts.some((t) => document.body?.innerText?.includes(t)),
+          { timeout: 3000 },
+          confirmationTexts
+        ).then(() => true).catch(() => false)
+      : page.evaluate(
+          (texts) => texts.some((t) => document.body?.innerText?.includes(t)),
+          confirmationTexts
+        ).catch(() => false));
 
     if (!confirmationFound) {
-      nicknameConfirmed = false;
-      warn(`Nickname confirmation text not detected: ${confirmationTexts.join(" | ")}`);
+      warn("Confirmation not detected for", nickname, "— aborting");
+      throw new Error("Join confirmation not detected");
     }
   } catch (err) {
-    warn("Nickname form automation failed:", err);
+    warn("Join automation failed:", err);
+    try {
+      if (page && !(typeof page.isClosed === "function" && page.isClosed()) && typeof page.close === "function") await page.close();
+      if (context && typeof context.close === "function") await context.close();
+    } catch { /* ignore */ }
     throw err;
   }
 
-  log("Page ready for session", pin, nickname);
-
-  let latestSnapshot = "";
-  let previousSnapshot = "";
-
-  const captureSnapshot = async () => {
-    if (!page || (typeof page.isClosed === "function" && page.isClosed())) {
-      warn("Snapshot capture skipped because page is closed");
-      return latestSnapshot;
-    }
-    try {
-      const html = await page.content();
-      const snapshot = sanitizeHtml(html);
-      latestSnapshot = snapshot;
-      log("Captured snapshot for session", pin, nickname);
-      return snapshot;
-    } catch (error) {
-      errorLog("Session snapshot failed:", error);
-      return latestSnapshot;
-    }
-  };
-
-  const sendSnapshot = async (force = false) => {
-    const snapshot = await captureSnapshot();
-    if (!snapshot) return;
-    if (!force && snapshot === previousSnapshot) return;
-    previousSnapshot = snapshot;
-    if (socket.readyState === 1) {
-      socket.send(
-        JSON.stringify({
-          type: "snapshot",
-          html: snapshot,
-          timestamp: Date.now(),
-        })
-      );
-    }
-  };
-
-  const interval = setInterval(async () => {
-    await sendSnapshot();
-  }, 1000);
-  log("Session interval started", pin, nickname);
-
-  page.on("framenavigated", async () => {
-    log("Frame navigated, sending snapshot", pin, nickname);
-    await sendSnapshot();
-  });
+  log("Session ready", pin, nickname);
 
   const sessionId = createSessionId();
+  let lastPhase = "waiting";
+
+  const phaseInterval = setInterval(async () => {
+    try {
+      if (!page || (typeof page.isClosed === "function" && page.isClosed())) {
+        await killSession(sessionId, "page closed unexpectedly");
+        return;
+      }
+      const nowPhase = await detectPhase(page);
+      if (nowPhase !== lastPhase) {
+        lastPhase = nowPhase;
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ type: "phase", phase: nowPhase }));
+        }
+      }
+    } catch (err) {
+      await killSession(sessionId, err);
+    }
+  }, 800);
+
   const hardTimeout = setTimeout(async () => {
-    log("Session hard timeout reached", sessionId, pin, nickname);
+    log("Hard timeout reached", sessionId);
     if (socket.readyState === 1) {
-      socket.send(
-        JSON.stringify({
-          type: "status",
-          message: "Session timed out after 1 hour and will be closed.",
-        })
-      );
+      socket.send(JSON.stringify({ type: "status", message: "Session timed out after 1 hour." }));
       socket.close();
     }
-    await cleanupSession(sessionId).catch((err) =>
-      warn("Hard timeout cleanup failed", sessionId, err)
-    );
+    await cleanupSession(sessionId).catch((err) => warn("Hard timeout cleanup failed", err));
   }, 3600_000);
 
-  return {
-    id: sessionId,
-    socket,
-    pin,
-    nickname,
-    context,
-    page,
-    captureSnapshot,
-    sendSnapshot,
-    interval,
-    hardTimeout,
-    latestSnapshot,
-    nicknameConfirmed,
-  };
+  return { id: sessionId, socket, pin, nickname, context, page, phaseInterval, hardTimeout };
+};
+
+const killSession = async (sessionId, reason) => {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  errorLog("Killing session", sessionId, reason);
+  if (session.socket.readyState === 1) {
+    try {
+      session.socket.send(JSON.stringify({ type: "error", message: "charlie kirk died :( rip" }));
+    } catch { /* ignore */ }
+    session.socket.close();
+  }
+  await cleanupSession(sessionId);
 };
 
 const cleanupSession = async (sessionId) => {
   const session = sessions.get(sessionId);
   if (!session) return;
-  clearInterval(session.interval);
+  clearInterval(session.phaseInterval);
   clearTimeout(session.hardTimeout);
   try {
     log("Cleaning up session", sessionId);
-    if (session.page && typeof session.page.close === "function") {
-      await session.page.close();
-    }
-    if (session.context && typeof session.context.close === "function") {
-      await session.context.close();
-    }
+    if (session.page && typeof session.page.close === "function") await session.page.close();
+    if (session.context && typeof session.context.close === "function") await session.context.close();
   } catch (error) {
-    warn("Failed to clean up session", sessionId, error);
+    warn("Cleanup error", sessionId, error);
   }
   sessions.delete(sessionId);
 };
@@ -313,6 +200,7 @@ const startBrowser = async () => {
     log("Launching Puppeteer browser...");
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
     log("Puppeteer browser launched");
@@ -324,8 +212,6 @@ const startBrowser = async () => {
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", browser: Boolean(browser), sessions: sessions.size });
 });
-
-app.use(express.json());
 
 const VALID_SHAPES = new Set(["triangle", "circle", "diamond", "square"]);
 
@@ -342,31 +228,29 @@ app.post("/click-answer", async (req, res) => {
   }
 
   const session = sessions.get(sessionId);
-  if (!session) {
-    return res.status(404).json({ error: "Session not found." });
-  }
+  if (!session) return res.status(404).json({ error: "Session not found." });
 
   try {
-    // Find the answer button by scanning SR-only spans (contains "Blue diamond" etc.)
-    // then walk up to the nearest button ancestor and use Puppeteer's native click.
     const elementHandle = await session.page.evaluateHandle((shape) => {
-      // Prefer the SR-only label spans Kahoot uses for accessibility
-      const srSpans = Array.from(document.querySelectorAll("span.styles_SROnly__orvnxj0, [class*='SROnly'], [class*='sr-only'], [class*='srOnly']"));
+      const srSpans = Array.from(document.querySelectorAll(
+        "span.styles_SROnly__orvnxj0, [class*='SROnly'], [class*='sr-only'], [class*='srOnly']"
+      ));
       for (const span of srSpans) {
         if (span.textContent?.trim().toLowerCase().includes(shape)) {
-          // Walk up to the button
           let el = span;
           while (el && el.tagName !== "BUTTON") el = el.parentElement;
           if (el) return el;
         }
       }
-      // Fallback: scan all buttons whose full text includes the shape
-      const buttons = Array.from(document.querySelectorAll("button[type='submit'], button[data-functional-selector^='answer']"));
+      const buttons = Array.from(document.querySelectorAll(
+        "button[type='submit'], button[data-functional-selector^='answer']"
+      ));
       return buttons.find((b) => b.textContent?.toLowerCase().includes(shape)) ?? null;
     }, normalizedShape);
 
     const element = elementHandle?.asElement ? elementHandle.asElement() : null;
     if (!element) {
+      warn("Answer button not found in DOM for shape", normalizedShape, "session", sessionId);
       return res.status(404).json({ error: "Answer button not found in DOM." });
     }
 
@@ -374,30 +258,17 @@ app.post("/click-answer", async (req, res) => {
     elementHandle.dispose();
 
     log("Clicked answer", normalizedShape, "for session", sessionId);
-    await session.sendSnapshot(true);
     return res.json({ ok: true, shape: normalizedShape });
   } catch (error) {
     errorLog("click-answer failed:", error);
+    await killSession(sessionId, error);
     return res.status(500).json({ error: "Click failed on backend." });
   }
 });
 
-app.get("/snapshot", async (req, res) => {
-  const sessionId = req.query.session;
-  if (sessionId && typeof sessionId === "string") {
-    const session = sessions.get(sessionId);
-    if (session) {
-      const html = await session.captureSnapshot();
-      return res.json({ html, timestamp: Date.now(), session: sessionId });
-    }
-    return res.status(404).json({ error: "Session not found" });
-  }
-
-  return res.json({ html: "", timestamp: Date.now(), sessions: sessions.size });
-});
-
 wss.on("connection", (socket) => {
   log("WebSocket connection opened");
+
   if (!browser) {
     socket.send(JSON.stringify({ type: "status", message: "backend unavailable" }));
     socket.close();
@@ -405,12 +276,10 @@ wss.on("connection", (socket) => {
   }
 
   if (sessions.size >= MAX_ACTIVE_SESSIONS) {
-    socket.send(
-      JSON.stringify({
-        type: "error",
-        message: `Maximum active sessions reached (${MAX_ACTIVE_SESSIONS}). Please try again later.`,
-      })
-    );
+    socket.send(JSON.stringify({
+      type: "error",
+      message: `Maximum active sessions reached (${MAX_ACTIVE_SESSIONS}). Please try again later.`,
+    }));
     socket.close();
     return;
   }
@@ -430,87 +299,39 @@ wss.on("connection", (socket) => {
   socket.on("message", async (message) => {
     try {
       const data = JSON.parse(message.toString());
-      log("WS message received", data?.type, data?.action ?? "");
+      log("WS message received", data?.type);
 
       if (data?.type === "init") {
-        if (initialized) {
-          return;
-        }
+        if (initialized) return;
 
         const pin = String(data.pin || "").trim();
-        const nickname = String(data.nickname || "").trim();
-
         if (!/^\d{7}$/.test(pin)) {
-          warn("Invalid PIN received", pin);
           socket.send(JSON.stringify({ type: "error", message: "pin must be a 7-digit number" }));
           return;
         }
 
-        if (!nickname) {
-          warn("Missing nickname received");
-          socket.send(JSON.stringify({ type: "error", message: "nickname is required" }));
-          return;
-        }
-
         try {
-          session = await createSession(socket, pin, nickname);
+          session = await createSession(socket, pin);
           sessions.set(session.id, session);
           initialized = true;
-          log("Session created", session.id, pin, nickname);
+          log("Session created", session.id, pin, session.nickname);
         } catch (error) {
           errorLog("Failed to create session:", error);
-          socket.send(
-            JSON.stringify({
-              type: "error",
-              message:
-                "Unable to join the game. Make sure your nickname is not taken, profane, or previously entered in this session, and that the game PIN is correct.",
-            })
-          );
+          socket.send(JSON.stringify({
+            type: "error",
+            message: "Unable to join the game. Make sure the PIN is correct and the game is open.",
+          }));
           socket.close();
           return;
         }
 
-        if (session && session.nicknameConfirmed === false) {
-          socket.send(
-            JSON.stringify({
-              type: "warning",
-              message:
-                "Nickname confirmation was not detected. The backend is still streaming the page, but the join may not have completed successfully.",
-            })
-          );
-        }
-
         socket.send(JSON.stringify({ type: "status", message: "connected" }));
-        socket.send(JSON.stringify({ type: "session", sessionId: session.id, pin, nickname }));
-        await session.sendSnapshot(true);
-        return;
-      }
-
-      if (data?.type === "refresh") {
-        log("Refresh request received", session?.id || "no-session");
-        if (session) {
-          await session.sendSnapshot(true);
-        }
-        return;
-      }
-
-      if (data?.type === "element-action") {
-        if (!session || !initialized) {
-          socket.send(JSON.stringify({ type: "status", message: "Session not ready for actions" }));
-          return;
-        }
-
-        try {
-          const { action, descriptor, value } = data;
-          const result = await performElementAction(session.page, action, descriptor, value);
-          if (!result.success) {
-            socket.send(JSON.stringify({ type: "status", message: `Action failed: ${result.message}` }));
-          }
-          await session.sendSnapshot(true);
-        } catch (error) {
-          errorLog("Element action failed:", error);
-          socket.send(JSON.stringify({ type: "status", message: "Action failed on backend" }));
-        }
+        socket.send(JSON.stringify({
+          type: "session",
+          sessionId: session.id,
+          pin,
+          nickname: session.nickname,
+        }));
         return;
       }
     } catch (error) {
@@ -530,16 +351,19 @@ wss.on("connection", (socket) => {
 });
 
 server.listen(PORT, async () => {
-  console.log(`Kahoot snapshot backend listening on http://localhost:${PORT}`);
+  console.log(`Kirkahoot backend listening on http://localhost:${PORT}`);
   await startBrowser();
   startSessionCountLog();
 });
 
-process.on("SIGINT", async () => {
-  console.log("Shutting down Puppeteer...");
+const shutdown = async (signal) => {
+  console.log(`Shutting down on ${signal}...`);
   for (const sessionId of Array.from(sessions.keys())) {
     await cleanupSession(sessionId);
   }
   if (browser) await browser.close();
   process.exit(0);
-});
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
