@@ -104,8 +104,8 @@ function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; resu
 const TITLE_PARTS = [
   { text: "low",             origin: "lowkey",         color: "#ff6600", rot: "-4deg"  },
   { text: "kirk",            origin: "charlie kirk",   color: "#cc0000", rot: "3deg"   },
-  { text: "hoot",            origin: "kahoot",         color: "#0044cc", rot: "-2deg"  },
-  { text: "enuinsplainin'",  origin: "mansplainin'",   color: "#cc00cc", rot: "2deg"   },
+  { text: "hoot",            origin: "in kahoot",         color: "#0044cc", rot: "-2deg"  },
+  { text: "enuinsplainin'",  origin: "be mansplainin'",   color: "#cc00cc", rot: "2deg"   },
 ];
 
 // phase 0 = squished (resting), 1 = spread, 2 = squish A (low+hoot), 3 = squish B (kirk+enuins), 4 = all normal spread
@@ -140,6 +140,7 @@ function WonkyTitle() {
     const squishing = squishA || squishB;
     return {
       display: "inline-block",
+      whiteSpace: "nowrap",
       color: spread ? p.color : "#cc0000",
       transform: squishing
         ? `scaleY(0.12) rotate(0deg)`
@@ -157,29 +158,12 @@ function WonkyTitle() {
     };
   };
 
-  const labelStyle = (i: number): React.CSSProperties => ({
-    position: "absolute",
-    bottom: "-18px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    fontSize: "9px",
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-    color: TITLE_PARTS[i].color,
-    opacity: phase >= 1 && phase <= 4 ? 1 : 0,
-    transition: "opacity 0.3s",
-    textShadow: "none",
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
-  });
-
   return (
     <h1 className="anim-bounce-title text-center text-4xl font-black tracking-tight select-none pb-5"
       style={{lineHeight: 1.2}}>
       {TITLE_PARTS.map((p, i) => (
-        <span key={i} style={{position:"relative", display:"inline-block"}}>
-          <span style={partStyle(i)}>{p.text}</span>
-          <span style={labelStyle(i)}>{p.origin}</span>
+        <span key={i} style={partStyle(i)}>
+          {phase >= 1 ? p.origin : p.text}
         </span>
       ))}
     </h1>

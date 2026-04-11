@@ -14,7 +14,7 @@ def main() -> None:
         image_base64 = base64.b64encode(f.read()).decode("utf-8")
     
     payload = {
-        "prompt": 'This image displays a Kahoot question with answers that correspond to a red triangle, blue diamond, yellow circle, or green square. Identify the correct answer to the question and answer me in the format: Shape Color, because... starting exactly with the capitalized names, in brackets, of color and shape: Red Triangle, Yellow Circle, Blue Diamond, or Green Square, and then add your reasoning (max 2 sentences). Plain text ONLY! Do not add formatting or weird characters.',
+        "prompt": 'This image shows a Kahoot question with four answer buttons: Red Triangle, Yellow Circle, Blue Diamond, Green Square. Pick exactly one correct answer and respond ONLY in this format: "Color Shape, because <one sentence reason>." Example: "Red Triangle, because Rome fell in 476 AD." No other text.',
         "imageBase64": image_base64,
         "mimeType": "image/jpeg",
     }
