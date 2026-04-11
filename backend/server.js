@@ -61,7 +61,7 @@ const detectPhase = async (page) => {
         return text ? labels.some((label) => text.includes(label)) : false;
       })) return "answering";
       return "waiting";
-    }, labels, correctFrag, incorrectFrag);
+    }, ANSWER_LABELS, CORRECT_PATH_FRAGMENT, INCORRECT_PATH_FRAGMENT);
   } catch {
     return "waiting";
   }
@@ -136,6 +136,7 @@ const createSession = async (socket, pin) => {
 
   const sessionId = createSessionId();
   let lastPhase = "waiting";
+  const answeringTimeoutRef = { current: null };
 
   const phaseInterval = setInterval(async () => {
     try {
@@ -144,7 +145,16 @@ const createSession = async (socket, pin) => {
         return;
       }
       const nowPhase = await detectPhase(page);
-      if (nowPhase !== lastPhase) {
+      // Once answering, suppress spurious "waiting" flashes until correct/incorrect
+      const suppress = nowPhase === "waiting" && lastPhase === "answering";
+      if (!suppress && nowPhase !== lastPhase) {
+        // Start 5-minute answering watchdog
+        if (nowPhase === "answering") {
+          answeringTimeoutRef.current = setTimeout(() => killSession(sessionId, "answering phase exceeded 5 minutes"), 300_000);
+        } else if (answeringTimeoutRef.current) {
+          clearTimeout(answeringTimeoutRef.current);
+          answeringTimeoutRef.current = null;
+        }
         lastPhase = nowPhase;
         if (socket.readyState === 1) {
           socket.send(JSON.stringify({ type: "phase", phase: nowPhase }));
@@ -164,7 +174,7 @@ const createSession = async (socket, pin) => {
     await cleanupSession(sessionId).catch((err) => warn("Hard timeout cleanup failed", err));
   }, 3600_000);
 
-  return { id: sessionId, socket, pin, nickname, context, page, phaseInterval, hardTimeout };
+  return { id: sessionId, socket, pin, nickname, context, page, phaseInterval, hardTimeout, answeringTimeoutRef };
 };
 
 const killSession = async (sessionId, reason) => {
@@ -185,6 +195,7 @@ const cleanupSession = async (sessionId) => {
   if (!session) return;
   clearInterval(session.phaseInterval);
   clearTimeout(session.hardTimeout);
+  if (session.answeringTimeoutRef?.current) clearTimeout(session.answeringTimeoutRef.current);
   try {
     log("Cleaning up session", sessionId);
     if (session.page && typeof session.page.close === "function") await session.page.close();
