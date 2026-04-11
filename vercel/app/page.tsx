@@ -125,9 +125,13 @@ export default function Home() {
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   useEffect(() => {
+    if (!connected) return;
+
+    let stopped = false;
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
@@ -143,12 +147,15 @@ export default function Home() {
     startCamera();
 
     return () => {
+      stopped = true;
       if (videoRef.current?.srcObject instanceof MediaStream) {
         const tracks: MediaStreamTrack[] = videoRef.current.srcObject.getTracks();
         tracks.forEach((track) => track.stop());
       }
+      setCameraActive(false);
+      setCameraError(null);
     };
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     return () => {
@@ -370,30 +377,47 @@ export default function Home() {
         {/* Charlie Kirk's Den */}
         <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <span>Charlie Kirk&apos;s Den</span>
-            <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-              {streamStatus}
-            </span>
+            <span>lowkirkhootenuinsplainin&apos;</span>
+            {connected && (
+              <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                {streamStatus}
+              </span>
+            )}
           </div>
 
           {!connected ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                inputMode="numeric"
-                maxLength={7}
-                value={pin}
-                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
-                className="w-48 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-                placeholder="Game PIN (7 digits)"
+            <div className="space-y-5">
+              {/* Kirk portrait */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/kirkpie.png"
+                alt="Charlie Kirk"
+                className="mx-auto h-40 w-40 rounded-full object-cover shadow-lg"
               />
-              <button
-                type="button"
-                onClick={handleConnect}
-                disabled={connecting || connected}
-                className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {connecting ? "Connecting..." : "Oh LAWD he comin'!"}
-              </button>
+              <p className="text-center text-xs leading-relaxed text-zinc-400 dark:text-zinc-500 max-w-sm mx-auto">
+                Enter your game PIN and Charlie Kirk will crash this bih type shi, when a question drops, dis YN's
+                be seeing thru yo camera n' picks the answer, n
+                crodie clicks it on his own Kahoot session fam, all before ya&apos;ve even read the question.
+                You just watch the carnage.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <input
+                  inputMode="numeric"
+                  maxLength={7}
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
+                  className="w-48 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  placeholder="Game PIN (7 digits)"
+                />
+                <button
+                  type="button"
+                  onClick={handleConnect}
+                  disabled={connecting || connected}
+                  className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {connecting ? "Connecting..." : "Oh LAWD he comin'!"}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -441,55 +465,62 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Kahoot iframe — always visible */}
-        <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
-          <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <span>Kahoot</span>
-          </div>
-          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
-            <iframe
-              ref={kahootIframeRef}
-              src="https://kahoot.it"
-              title="Kahoot"
-              className="h-[520px] w-full min-w-[320px] bg-white"
-            />
-          </div>
-        </div>
+        {/* Camera + Kahoot — only shown after connection */}
+        {connected && (
+          <>
+            {/* Kahoot iframe */}
+            <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
+              <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                <span>Kahoot</span>
+              </div>
+              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
+                <iframe
+                  ref={kahootIframeRef}
+                  src="https://kahoot.it"
+                  title="Kahoot"
+                  className="h-[520px] w-full min-w-[320px] bg-white"
+                />
+              </div>
+            </div>
 
-        <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
-          <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <span>Charlie Kirk's eyeballz</span>
-            <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-900/40 dark:text-green-200">
-              {cameraActive ? "Active" : "Initializing"}
-            </span>
-          </div>
-          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
-            <video
-              ref={videoRef}
-              className="h-[320px] w-full object-cover transition-transform duration-150"
-              style={{ transform: `scale(${cameraZoom})` }}
-              playsInline
-              muted
-            />
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 w-16 shrink-0">Zoom {cameraZoom.toFixed(1)}×</span>
-            <input
-              type="range"
-              min={1}
-              max={4}
-              step={0.1}
-              value={cameraZoom}
-              onChange={(e) => setCameraZoom(parseFloat(e.target.value))}
-              className="w-full accent-blue-600"
-            />
-          </div>
-          {cameraError ? (
-            <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/40 dark:text-red-200">
-              {cameraError}
-            </p>
-          ) : null}
-        </div>
+            {/* Charlie Kirk's eyeballz */}
+            <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
+              <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                <span>Charlie Kirk&apos;s eyeballz</span>
+                <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                  {cameraActive ? "Active" : "Initializing"}
+                </span>
+              </div>
+              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
+                <video
+                  ref={videoRef}
+                  className="h-[320px] w-full object-cover transition-transform duration-150"
+                  style={{ transform: `scale(${cameraZoom})` }}
+                  playsInline
+                  muted
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 w-16 shrink-0">Zoom {cameraZoom.toFixed(1)}×</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={4}
+                  step={0.1}
+                  value={cameraZoom}
+                  onChange={(e) => setCameraZoom(parseFloat(e.target.value))}
+                  className="w-full accent-blue-600"
+                />
+              </div>
+              {cameraError ? (
+                <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                  {cameraError}
+                </p>
+              ) : null}
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );
