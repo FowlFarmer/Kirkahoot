@@ -89,6 +89,7 @@ export default function Home() {
   const answerSentRef = useRef(false);
   const [inferenceResult, setInferenceResult] = useState<string | null>(null);
   const [inferring, setInferring] = useState(false);
+  const [autoSubmit, setAutoSubmit] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
@@ -373,7 +374,7 @@ export default function Home() {
       setInferenceResult(text);
 
       // Auto-click the matching answer button on the backend
-      if (answer) {
+      if (answer && autoSubmit) {
         const shapeWord = answer.split(" ")[1].toLowerCase(); // e.g. "diamond"
         sendClickAnswer(shapeWord);
       }
@@ -554,6 +555,24 @@ export default function Home() {
                 <p className={`mt-2 text-sm ${answeringPhase ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
                   {answeringPhase ? "Answering phase" : "Not in answering phase"}
                 </p>
+                <label className="mt-3 flex cursor-pointer items-center gap-3">
+                  <span className="text-sm text-zinc-600 dark:text-zinc-400">Gemini auto-submit</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoSubmit}
+                    onClick={() => setAutoSubmit((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                      autoSubmit ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        autoSubmit ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </label>
                 <button
                   type="button"
                   onClick={handleDisconnect}
