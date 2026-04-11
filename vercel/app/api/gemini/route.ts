@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 export const runtime = "edge";
 
 const PROMPT =
-  "This image displays a Kahoot question with answers that correspond to a Red Triangle, Blue Diamond, Yellow Circle, or Green Square. Identify the correct answer to the question and answer me in this format: Shape Color, because... starting exactly with the capitalized names, of color and shape: Red Triangle, Yellow Circle, Blue Diamond, or Green Square, and then add your reasoning (exactly 1 sentence). Plain text ONLY! Do not add formatting or weird characters. If you cannot answer the question for any reason or don't know the answer, respond with: I cannot answer this question as...";
+  "This image displays a Kahoot question with answers that correspond to a Red Triangle, Blue Diamond, Yellow Circle, or Green Square. Identify the correct answer to the question and answer me in this format: Shape Color, because... starting exactly with the capitalized names, of color and shape: Red Triangle, Yellow Circle, Blue Diamond, or Green Square, and then add your reasoning (exactly 1 sentence). Plain text ONLY! Do not add formatting or weird characters. If you cannot answer the question for any reason, or if the image is actually an unrelated image, or don't know the answer, respond with: I cannot answer this question as...";
 
 const MAX_IMAGE_BYTES = 80 * 1024; // 80 KB
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;

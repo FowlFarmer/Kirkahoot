@@ -37,7 +37,15 @@ function ShapeIcon({ answer, color }: { answer: KahootAnswer; color: string }) {
   return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><rect x="2" y="2" width="24" height="24" fill={color} /></svg>;
 }
 
-function AnswerCard({ inferring, result }: { inferring: boolean; result: string | null }) {
+function AnswerCard({ inferring, result, answeringPhase }: { inferring: boolean; result: string | null; answeringPhase: boolean }) {
+  if (!answeringPhase && !inferring && !result) {
+    return (
+      <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Gemma answer</p>
+        <p className="text-zinc-400 dark:text-zinc-500">Waiting for answering phase…</p>
+      </div>
+    );
+  }
   if (inferring) {
     return (
       <div className="rounded-3xl border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
@@ -581,9 +589,7 @@ export default function Home() {
                   Disconnect
                 </button>
               </div>
-              {(inferring || inferenceResult) && (
-                <AnswerCard inferring={inferring} result={inferenceResult} />
-              )}
+              <AnswerCard inferring={inferring} result={inferenceResult} answeringPhase={answeringPhase} />
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
                 {streamHtml ? (
                   <iframe
