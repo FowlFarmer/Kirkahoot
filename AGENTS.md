@@ -21,7 +21,7 @@ Check out ORACLE_PUPPETEER_SETUP.md for details on project scope
 - The frontend renders snapshots into a sandboxed iframe and detects answer mode locally.
 - The backend enforces a hard 1-hour timeout per session.
 - Inference is handled by `/api/gemini` (Next.js route, `app/api/gemini/route.ts`) using `@google/genai` directly.
-- The route accepts `{ prompt, imageBase64, mimeType }` and returns `{ text }` as plain JSON.
+- The route accepts `{ imageBase64 }` (JPEG only, max 80 KB) and returns `{ text }` as plain JSON. The prompt is hardcoded inside the route.
 - The model is `gemma-3-4b-it` via the Google GenAI API (`GOOGLE_GENERATIVE_AI_API_KEY`).
 - Response text is sanitized: newlines, carriage returns, and null bytes are stripped before returning.
 
@@ -35,7 +35,7 @@ Check out ORACLE_PUPPETEER_SETUP.md for details on project scope
 - frontend detects answer phase by scanning the rendered iframe DOM for `triangle`, `circle`, `square`, or `diamond`
 - frontend shows a warning popup if nickname confirmation is not detected, while still keeping the stream active
 - backend session cleanup closes every session after 1 hour or when disconnected
-- `/api/gemini` receives a screenshot (base64) and prompt, calls Gemma 3 4B, and returns the sanitized answer text
+- `/api/gemini` receives a JPEG screenshot (base64, max 80 KB), validates magic bytes, calls Gemma 3 4B with a hardcoded prompt, and returns the sanitized answer text
 
 When the repo changes, update this file to keep the architecture notes accurate.
 

@@ -2,6 +2,72 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// ── Answer card ───────────────────────────────────────────────────────────────
+
+type KahootAnswer = "Red Triangle" | "Yellow Circle" | "Blue Diamond" | "Green Square";
+
+const ANSWER_STYLES: Record<KahootAnswer, { border: string; bg: string; text: string; iconColor: string }> = {
+  "Red Triangle":    { border: "border-red-400",    bg: "bg-red-50 dark:bg-red-950/60",    text: "text-red-900 dark:text-red-200",    iconColor: "#e53e3e" },
+  "Yellow Circle":   { border: "border-yellow-400",  bg: "bg-yellow-50 dark:bg-yellow-950/60", text: "text-yellow-900 dark:text-yellow-200", iconColor: "#d69e2e" },
+  "Blue Diamond":    { border: "border-blue-400",    bg: "bg-blue-50 dark:bg-blue-950/60",  text: "text-blue-900 dark:text-blue-200",  iconColor: "#3182ce" },
+  "Green Square":    { border: "border-green-400",   bg: "bg-green-50 dark:bg-green-950/60", text: "text-green-900 dark:text-green-200", iconColor: "#38a169" },
+};
+
+function parseAnswer(result: string): KahootAnswer | null {
+  const lower = result.toLowerCase();
+  const candidates: [KahootAnswer, number][] = ([
+    "Red Triangle",
+    "Yellow Circle",
+    "Blue Diamond",
+    "Green Square",
+  ] as KahootAnswer[]).map((a) => [a, lower.indexOf(a.toLowerCase())]);
+  const found = candidates.filter(([, i]) => i !== -1).sort((a, b) => a[1] - b[1]);
+  return found.length > 0 ? found[0][0] : null;
+}
+
+function ShapeIcon({ answer, color }: { answer: KahootAnswer; color: string }) {
+  const size = 28;
+  if (answer === "Red Triangle")
+    return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><polygon points="14,3 27,25 1,25" fill={color} /></svg>;
+  if (answer === "Yellow Circle")
+    return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><circle cx="14" cy="14" r="12" fill={color} /></svg>;
+  if (answer === "Blue Diamond")
+    return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><polygon points="14,1 27,14 14,27 1,14" fill={color} /></svg>;
+  // Green Square
+  return <svg width={size} height={size} viewBox="0 0 28 28" className="shrink-0"><rect x="2" y="2" width="24" height="24" fill={color} /></svg>;
+}
+
+function AnswerCard({ inferring, result }: { inferring: boolean; result: string | null }) {
+  if (inferring) {
+    return (
+      <div className="rounded-3xl border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Gemma answer</p>
+        <p>Analyzing…</p>
+      </div>
+    );
+  }
+  if (!result) return null;
+
+  const answer = parseAnswer(result);
+  const styles = answer ? ANSWER_STYLES[answer] : null;
+
+  return (
+    <div className={`rounded-3xl border p-4 text-sm font-medium ${
+      styles
+        ? `${styles.border} ${styles.bg} ${styles.text}`
+        : "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+    }`}>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-60">Gemma answer</p>
+      <div className="flex items-start gap-3">
+        {answer && <ShapeIcon answer={answer} color={styles!.iconColor} />}
+        <p className="leading-relaxed">{result}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -19,6 +85,9 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState("Enter a 7-digit PIN and nickname to start.");
   const [streamStatus, setStreamStatus] = useState("Disconnected");
   const [answeringPhase, setAnsweringPhase] = useState(false);
+  const prevAnsweringPhaseRef = useRef(false);
+  const [inferenceResult, setInferenceResult] = useState<string | null>(null);
+  const [inferring, setInferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
@@ -163,7 +232,12 @@ export default function Home() {
 
     try {
       updateIframeDocument(iframe, streamHtml);
-      setAnsweringPhase(detectAnswerPhaseFromIframe(iframe));
+      const nowAnswering = detectAnswerPhaseFromIframe(iframe);
+      if (nowAnswering && !prevAnsweringPhaseRef.current) {
+        captureAndInfer();
+      }
+      prevAnsweringPhaseRef.current = nowAnswering;
+      setAnsweringPhase(nowAnswering);
     } catch (error) {
       console.warn("Unable to update iframe content", error);
     }
@@ -184,6 +258,50 @@ export default function Home() {
     const interval = window.setInterval(updateAgo, 1000);
     return () => window.clearInterval(interval);
   }, [lastRefresh]);
+
+  const captureAndInfer = async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Compress to JPEG, reducing quality until decoded size <= 80 KB
+    const MAX_BYTES = 80 * 1024;
+    let quality = 0.85;
+    let dataUrl = canvas.toDataURL("image/jpeg", quality);
+    let base64 = dataUrl.split(",")[1];
+    while (Math.floor((base64.length * 3) / 4) > MAX_BYTES && quality > 0.1) {
+      quality = Math.max(0.1, quality - 0.1);
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+      base64 = dataUrl.split(",")[1];
+    }
+
+    if (Math.floor((base64.length * 3) / 4) > MAX_BYTES) {
+      setInferenceResult("Image too large to send even at minimum quality.");
+      return;
+    }
+
+    setInferring(true);
+    setInferenceResult(null);
+    try {
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64 }),
+      });
+      const json = await response.json();
+      setInferenceResult(json.text ?? json.error ?? "No response.");
+    } catch {
+      setInferenceResult("Failed to reach inference API.");
+    } finally {
+      setInferring(false);
+    }
+  };
 
   const validatePin = (value: string) => /^\d{7}$/.test(value);
 
@@ -355,6 +473,9 @@ export default function Home() {
                   Disconnect
                 </button>
               </div>
+              {(inferring || inferenceResult) && (
+                <AnswerCard inferring={inferring} result={inferenceResult} />
+              )}
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
                 {streamHtml ? (
                   <iframe
