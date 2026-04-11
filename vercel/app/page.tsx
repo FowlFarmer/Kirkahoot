@@ -99,6 +99,93 @@ function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; resu
   );
 }
 
+// ── Wonky title ───────────────────────────────────────────────────────────────
+
+const TITLE_PARTS = [
+  { text: "low",             origin: "lowkey",         color: "#ff6600", rot: "-4deg"  },
+  { text: "kirk",            origin: "charlie kirk",   color: "#cc0000", rot: "3deg"   },
+  { text: "hoot",            origin: "kahoot",         color: "#0044cc", rot: "-2deg"  },
+  { text: "enuinsplainin'",  origin: "mansplainin'",   color: "#cc00cc", rot: "2deg"   },
+];
+
+// phase 0 = squished (resting), 1 = spread, 2 = squish A (low+hoot), 3 = squish B (kirk+enuins), 4 = all normal spread
+function WonkyTitle() {
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    const run = async () => {
+      while (alive) {
+        await delay(5000);
+        if (!alive) break;
+        setPhase(1); await delay(550);
+        setPhase(2); await delay(520);
+        setPhase(3); await delay(520);
+        setPhase(4); await delay(420);
+        setPhase(0); await delay(700);
+      }
+    };
+    run();
+    return () => { alive = false; };
+  }, []);
+
+  const partStyle = (i: number): React.CSSProperties => {
+    const p = TITLE_PARTS[i];
+    const isA = i === 0 || i === 2;
+    const isB = i === 1 || i === 3;
+    const spread = phase >= 1;
+    const squishA = phase === 2 && isA;
+    const squishB = phase === 3 && isB;
+    const squishing = squishA || squishB;
+    return {
+      display: "inline-block",
+      color: spread ? p.color : "#cc0000",
+      transform: squishing
+        ? `scaleY(0.12) rotate(0deg)`
+        : spread
+        ? `rotate(${p.rot}) scaleY(1)`
+        : "rotate(0deg) scaleY(1)",
+      transformOrigin: "bottom center",
+      transition: "all 0.38s cubic-bezier(.36,.07,.19,.97)",
+      marginRight: spread ? "6px" : "0px",
+      verticalAlign: "bottom",
+      textShadow: spread
+        ? `2px 2px 0 #000`
+        : "3px 3px 0 #ffff00, 6px 6px 0 #0000cc",
+      position: "relative",
+    };
+  };
+
+  const labelStyle = (i: number): React.CSSProperties => ({
+    position: "absolute",
+    bottom: "-18px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    fontSize: "9px",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+    color: TITLE_PARTS[i].color,
+    opacity: phase >= 1 && phase <= 4 ? 1 : 0,
+    transition: "opacity 0.3s",
+    textShadow: "none",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+  });
+
+  return (
+    <h1 className="anim-bounce-title text-center text-4xl font-black tracking-tight select-none pb-5"
+      style={{lineHeight: 1.2}}>
+      {TITLE_PARTS.map((p, i) => (
+        <span key={i} style={{position:"relative", display:"inline-block"}}>
+          <span style={partStyle(i)}>{p.text}</span>
+          <span style={labelStyle(i)}>{p.origin}</span>
+        </span>
+      ))}
+    </h1>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -375,7 +462,7 @@ export default function Home() {
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-8">
 
         {/* Kirk header */}
-        <h1 className="anim-bounce-title text-center text-4xl font-black tracking-tight" style={{color:'#cc0000', textShadow:'3px 3px 0 #ffff00, 6px 6px 0 #0000cc'}}>lowkirkhootenuinsplainin&apos;</h1>
+        <WonkyTitle />
         <div className="flex flex-wrap items-center justify-center gap-4">
           <a href="https://ko-fi.com/A0A41XMQCC" target="_blank" rel="noopener noreferrer"
             className="anim-jelly inline-block"
