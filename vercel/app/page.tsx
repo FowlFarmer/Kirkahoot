@@ -86,6 +86,7 @@ export default function Home() {
   const [streamStatus, setStreamStatus] = useState("Disconnected");
   const [answeringPhase, setAnsweringPhase] = useState(false);
   const prevAnsweringPhaseRef = useRef(false);
+  const answerSentRef = useRef(false);
   const [inferenceResult, setInferenceResult] = useState<string | null>(null);
   const [inferring, setInferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -234,6 +235,7 @@ export default function Home() {
       updateIframeDocument(iframe, streamHtml);
       const nowAnswering = detectAnswerPhaseFromIframe(iframe);
       if (nowAnswering && !prevAnsweringPhaseRef.current) {
+        answerSentRef.current = false;
         captureAndInfer();
       }
       prevAnsweringPhaseRef.current = nowAnswering;
@@ -242,6 +244,49 @@ export default function Home() {
       console.warn("Unable to update iframe content", error);
     }
   }, [streamHtml]);
+
+  // Listen for clicks inside the sandboxed iframe and forward matching shapes to the backend
+  useEffect(() => {
+    const iframe = streamIframeRef.current;
+    if (!iframe) return;
+
+    const SHAPE_LABELS = ["triangle", "circle", "square", "diamond"];
+
+    const handleIframeClick = (event: MouseEvent) => {
+      if (!answeringPhase) return;
+      const target = event.target as Element | null;
+      if (!target) return;
+
+      // Walk up from the click target to find a button with a recognizable shape label
+      let el: Element | null = target;
+      while (el) {
+        const text = el.textContent?.toLowerCase() ?? "";
+        const shape = SHAPE_LABELS.find((s) => text.includes(s));
+        if (shape && (el.tagName === "BUTTON" || el.getAttribute("role") === "button")) {
+          sendClickAnswer(shape);
+          break;
+        }
+        el = el.parentElement;
+      }
+    };
+
+    const attachListener = () => {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        doc.addEventListener("click", handleIframeClick, true);
+      }
+    };
+
+    // Attach now and re-attach whenever the iframe loads
+    attachListener();
+    iframe.addEventListener("load", attachListener);
+
+    return () => {
+      iframe.removeEventListener("load", attachListener);
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) doc.removeEventListener("click", handleIframeClick, true);
+    };
+  }, [answeringPhase, sessionId]);
 
   useEffect(() => {
     if (lastRefresh === null) {
@@ -258,6 +303,18 @@ export default function Home() {
     const interval = window.setInterval(updateAgo, 1000);
     return () => window.clearInterval(interval);
   }, [lastRefresh]);
+
+  const sendClickAnswer = (shape: string) => {
+    const sid = sessionId;
+    if (!sid) return;
+    if (answerSentRef.current) return;
+    answerSentRef.current = true;
+    fetch("http://localhost:3001/click-answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: sid, shape }),
+    }).catch(() => {});
+  };
 
   const captureAndInfer = async () => {
     const video = videoRef.current;
@@ -288,14 +345,38 @@ export default function Home() {
 
     setInferring(true);
     setInferenceResult(null);
-    try {
+
+    const callGemini = async (imageBase64: string): Promise<string> => {
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64 }),
       });
       const json = await response.json();
-      setInferenceResult(json.text ?? json.error ?? "No response.");
+      return json.text ?? json.error ?? "No response.";
+    };
+
+    try {
+      let text = await callGemini(base64);
+      let answer = parseAnswer(text);
+
+      // Dev-only fallback: retry with the test image if no valid answer detected
+      if (!answer && process.env.NODE_ENV === "development") {
+        const testResp = await fetch("/test_endpoint1.jpg");
+        const testBuffer = await testResp.arrayBuffer();
+        const testBase64 = btoa(String.fromCharCode(...new Uint8Array(testBuffer)));
+        text = await callGemini(testBase64);
+        answer = parseAnswer(text);
+        if (answer) text = `[dev fallback] ${text}`;
+      }
+
+      setInferenceResult(text);
+
+      // Auto-click the matching answer button on the backend
+      if (answer) {
+        const shapeWord = answer.split(" ")[1].toLowerCase(); // e.g. "diamond"
+        sendClickAnswer(shapeWord);
+      }
     } catch {
       setInferenceResult("Failed to reach inference API.");
     } finally {
@@ -319,6 +400,10 @@ export default function Home() {
     setConnecting(true);
     setStreamStatus("Connecting");
     setStatusMessage("Attempting to connect to the Kahoot game...");
+    setInferenceResult(null);
+    setInferring(false);
+    prevAnsweringPhaseRef.current = false;
+    answerSentRef.current = false;
 
     const socket = new WebSocket("ws://localhost:3001/ws");
     socketRef.current = socket;
@@ -400,6 +485,10 @@ export default function Home() {
     setSessionId(null);
     setStreamHtml("");
     setAnsweringPhase(false);
+    prevAnsweringPhaseRef.current = false;
+    answerSentRef.current = false;
+    setInferenceResult(null);
+    setInferring(false);
     setStatusMessage("Disconnected.");
     setStreamStatus("Disconnected");
   };

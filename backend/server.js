@@ -325,6 +325,63 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", browser: Boolean(browser), sessions: sessions.size });
 });
 
+app.use(express.json());
+
+const VALID_SHAPES = new Set(["triangle", "circle", "diamond", "square"]);
+
+app.post("/click-answer", async (req, res) => {
+  const { sessionId, shape } = req.body ?? {};
+
+  if (!sessionId || typeof sessionId !== "string") {
+    return res.status(400).json({ error: "sessionId is required." });
+  }
+
+  const normalizedShape = typeof shape === "string" ? shape.trim().toLowerCase() : "";
+  if (!VALID_SHAPES.has(normalizedShape)) {
+    return res.status(400).json({ error: `shape must be one of: ${[...VALID_SHAPES].join(", ")}.` });
+  }
+
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return res.status(404).json({ error: "Session not found." });
+  }
+
+  try {
+    // Find the answer button by scanning SR-only spans (contains "Blue diamond" etc.)
+    // then walk up to the nearest button ancestor and use Puppeteer's native click.
+    const elementHandle = await session.page.evaluateHandle((shape) => {
+      // Prefer the SR-only label spans Kahoot uses for accessibility
+      const srSpans = Array.from(document.querySelectorAll("span.styles_SROnly__orvnxj0, [class*='SROnly'], [class*='sr-only'], [class*='srOnly']"));
+      for (const span of srSpans) {
+        if (span.textContent?.trim().toLowerCase().includes(shape)) {
+          // Walk up to the button
+          let el = span;
+          while (el && el.tagName !== "BUTTON") el = el.parentElement;
+          if (el) return el;
+        }
+      }
+      // Fallback: scan all buttons whose full text includes the shape
+      const buttons = Array.from(document.querySelectorAll("button[type='submit'], button[data-functional-selector^='answer']"));
+      return buttons.find((b) => b.textContent?.toLowerCase().includes(shape)) ?? null;
+    }, normalizedShape);
+
+    const element = elementHandle?.asElement ? elementHandle.asElement() : null;
+    if (!element) {
+      return res.status(404).json({ error: "Answer button not found in DOM." });
+    }
+
+    await element.click({ delay: 30 });
+    elementHandle.dispose();
+
+    log("Clicked answer", normalizedShape, "for session", sessionId);
+    await session.sendSnapshot(true);
+    return res.json({ ok: true, shape: normalizedShape });
+  } catch (error) {
+    errorLog("click-answer failed:", error);
+    return res.status(500).json({ error: "Click failed on backend." });
+  }
+});
+
 app.get("/snapshot", async (req, res) => {
   const sessionId = req.query.session;
   if (sessionId && typeof sessionId === "string") {

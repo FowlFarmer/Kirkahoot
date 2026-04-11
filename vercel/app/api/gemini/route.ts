@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 
   const response = await ai.models.generateContent({
-    model: "gemma-3-27b-it",
+    model: "gemma-3-4b-it",
     contents: [
       { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
       { text: PROMPT },
