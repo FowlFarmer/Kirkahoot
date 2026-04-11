@@ -42,28 +42,28 @@ function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; resu
 
   if (isGray) {
     return (
-      <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Charlie Kirk&apos;s Response</p>
-        <p className="text-zinc-400 dark:text-zinc-500">
-          {result ? result : "Charlie Kirk is waiting for the question…"}
+      <div className="rounded-3xl border-4 border-dashed border-yellow-400 bg-yellow-50 p-4 text-sm dark:bg-yellow-950/30 anim-jelly">
+        <p className="mb-1 text-xs font-black uppercase tracking-widest text-yellow-600">🧠 KIRK BRAIN STATUS 🧠</p>
+        <p className="text-yellow-700 dark:text-yellow-300 font-bold">
+          {result ? result : "zzzz... charlie is sleeping... waiting 4 questoin... 😴💤"}
         </p>
       </div>
     );
   }
   if (inferring) {
     return (
-      <div className="rounded-3xl border border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
-        <p>Charlie Kirk is thinking…</p>
+      <div className="rounded-3xl border-4 border-purple-500 bg-purple-50 p-4 text-sm dark:bg-purple-950/30 anim-pulse-slow">
+        <p className="mb-1 text-xs font-black uppercase tracking-widest text-purple-600">🔥 KIRK NEURONS FIRING 🔥</p>
+        <p className="text-purple-700 dark:text-purple-300 font-bold text-lg">big thinkign... 🤔🤔🤔</p>
       </div>
     );
   }
 
   if (gamePhase === "correct") {
     return (
-      <div className="rounded-3xl border border-emerald-400 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
-        <p className="text-lg font-bold">✓ Correct!</p>
+      <div className="anim-jelly rounded-3xl border-4 border-green-400 bg-green-50 p-4 text-sm font-bold text-green-800 dark:bg-green-950/40 dark:text-green-200">
+        <p className="mb-1 text-xs font-black uppercase tracking-widest text-green-600">🏆 KIRK SMASHED IT 🏆</p>
+        <p className="text-2xl font-black">✅ W!!! HE ATE!!! 🐊</p>
         {result && <p className="mt-1 leading-relaxed opacity-80">{result}</p>}
       </div>
     );
@@ -71,9 +71,9 @@ function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; resu
 
   if (gamePhase === "incorrect") {
     return (
-      <div className="rounded-3xl border border-red-400 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-600 dark:bg-red-950/40 dark:text-red-200">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
-        <p className="text-lg font-bold">✗ Wrong!</p>
+      <div className="anim-shake rounded-3xl border-4 border-red-400 bg-red-50 p-4 text-sm font-bold text-red-800 dark:bg-red-950/40 dark:text-red-200">
+        <p className="mb-1 text-xs font-black uppercase tracking-widest text-red-600">💀 KIRK FUMBLED 💀</p>
+        <p className="text-2xl font-black">❌ L BOZO ratio&apos;d 💀💀💀</p>
         {result && <p className="mt-1 leading-relaxed opacity-80">{result}</p>}
       </div>
     );
@@ -90,7 +90,7 @@ function AnswerCard({ inferring, result, gamePhase }: { inferring: boolean; resu
         ? `${styles.border} ${styles.bg} ${styles.text}`
         : "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
     }`}>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-60">Charlie Kirk&apos;s Response</p>
+      <p className="mb-2 text-xs font-black uppercase tracking-widest text-orange-500">🎯 KIRK PICKED: 🎯</p>
       <div className="flex items-start gap-3">
         {answer && <ShapeIcon answer={answer} color={styles!.iconColor} />}
         <p className="leading-relaxed">{result}</p>
@@ -371,16 +371,33 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100 px-4 py-12 text-black dark:bg-zinc-950 dark:text-white">
+    <div className="min-h-screen px-4 py-12 text-black" style={{background: 'repeating-linear-gradient(45deg, #ff006620 0px, #ff006620 2px, #fff700 2px, #fff700 12px, #00ff8820 12px, #00ff8820 14px, #ffffff 14px, #ffffff 24px)'}}>
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-8">
 
+        {/* Kirk header */}
+        <h1 className="anim-bounce-title text-center text-4xl font-black tracking-tight" style={{color:'#cc0000', textShadow:'3px 3px 0 #ffff00, 6px 6px 0 #0000cc'}}>lowkirkhootenuinsplainin&apos;</h1>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <a href="https://ko-fi.com/A0A41XMQCC" target="_blank" rel="noopener noreferrer"
+            className="anim-jelly inline-block"
+            style={{filter:'drop-shadow(4px 4px 0 #cc0000) drop-shadow(-2px -2px 0 #ffff00)'}}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img height="36" style={{border:'0px', height:'36px'}} src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Deuterium-Tritium Fusion Reactor" />
+          </a>
+          <a href="https://tzhu.dev" target="_blank" rel="noopener noreferrer"
+            className="anim-wobble inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-black text-white transition-transform"
+            style={{background:'linear-gradient(135deg,#0044cc,#cc00cc,#ff6600)', border:'3px solid #000', textShadow:'1px 1px 0 #000', boxShadow:'4px 4px 0 #ffff00, 6px 6px 0 #000'}}>
+            🌐 tzhu.dev
+          </a>
+        </div>
+        <p className="text-center text-xs font-bold uppercase tracking-widest" style={{color:'#0000cc'}}>⚠️ WARNING: contains based AI 🦅 conservative Kahoot domination ⚠️</p>
+
         {/* Charlie Kirk's Den */}
-        <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
-          <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            <span>lowkirkhootenuinsplainin&apos;</span>
+        <div className="anim-flash-border w-full rounded-3xl border-4 border-red-500 bg-white/95 p-6 shadow-2xl">
+          <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#cc0000,#ff6600,#ffcc00)', color:'white', textShadow:'1px 1px 0 #000'}}>
+            <span>🦅 lowkirkhootenuinsplainin&apos; 🦅</span>
             {connected && (
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                {streamStatus}
+              <span className="rounded-full px-2 py-1 text-xs font-black" style={{background:'#00ff88', color:'#000', border:'2px solid #000'}}>
+                🟢 {streamStatus}
               </span>
             )}
           </div>
@@ -392,9 +409,10 @@ export default function Home() {
               <img
                 src="/kirkpie.png"
                 alt="Charlie Kirk"
-                className="mx-auto h-40 w-40 rounded-full object-cover shadow-lg"
+                className="anim-kirk mx-auto h-40 w-40 object-cover shadow-lg"
+                style={{borderRadius:'50%'}}
               />
-              <p className="text-center text-xs leading-relaxed text-zinc-400 dark:text-zinc-500 max-w-sm mx-auto">
+              <p className="text-center text-sm leading-relaxed font-bold max-w-sm mx-auto" style={{color:'#cc0000'}}>
                 Enter your game PIN and Charlie Kirk will crash this bih type shi, when a question drops, dis YN's
                 be seeing thru yo camera n' picks the answer, n
                 crodie clicks it on his own Kahoot session fam, all before ya&apos;ve even read the question.
@@ -406,14 +424,14 @@ export default function Home() {
                   maxLength={7}
                   value={pin}
                   onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
-                  className="w-48 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition hover:border-zinc-400 focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  className="w-48 rounded-2xl px-4 py-3 text-sm outline-none font-bold" style={{border:'3px solid #cc0000', background:'#fffde7', color:'#000'}}
                   placeholder="Game PIN (7 digits)"
                 />
                 <button
                   type="button"
                   onClick={handleConnect}
                   disabled={connecting || connected}
-                  className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="anim-rainbow-btn rounded-full px-5 py-3 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50" style={{background:'linear-gradient(90deg,#cc0000,#ff6600,#ffcc00,#00cc44,#0044cc,#cc00cc)', backgroundSize:'300% 100%', border:'3px solid #000', textShadow:'1px 1px 0 #000'}}
                 >
                   {connecting ? "Connecting..." : "Oh LAWD he comin'!"}
                 </button>
@@ -421,27 +439,27 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
-                <p className="font-medium">Connected session</p>
-                <p className="mt-2 text-sm">PIN: {pin}</p>
-                <p className="mt-2 text-sm">Nickname: {connectedNickname ?? "—"}</p>
-                <p className={`mt-2 text-sm ${
-                  gamePhase === "answering" ? "text-emerald-700 dark:text-emerald-300" :
-                  gamePhase === "correct" ? "text-emerald-700 dark:text-emerald-300" :
-                  gamePhase === "incorrect" ? "text-red-700 dark:text-red-300" :
-                  "text-zinc-500 dark:text-zinc-400"
-                }`}>
-                  {gamePhase === "answering" ? "Answering phase" :
-                   gamePhase === "correct" ? "Correct!" :
-                   gamePhase === "incorrect" ? "Wrong!" :
-                   "Waiting"}
+              <div className="rounded-3xl border-4 border-dashed border-orange-500 p-4 text-sm font-bold" style={{background:'#fffde7'}}>
+                <p className="font-black text-base" style={{color:'#cc0000'}}>🎮 KIRK IS IN THE LOBBY 🎮</p>
+                <p className="mt-2">📌 PIN: <span style={{color:'#0044cc'}}>{pin}</span></p>
+                <p className="mt-1">🤠 nickname: <span style={{color:'#cc0000'}}>{connectedNickname ?? "—"}</span></p>
+                <p className={`mt-2 text-base font-black`} style={{color:
+                  gamePhase === "answering" ? "#00aa44" :
+                  gamePhase === "correct" ? "#00aa44" :
+                  gamePhase === "incorrect" ? "#cc0000" :
+                  "#888"
+                }}>
+                  {gamePhase === "answering" ? "🔥 ANSWERING RN 🔥" :
+                   gamePhase === "correct" ? "✅ W SECURED ✅" :
+                   gamePhase === "incorrect" ? "💀 L TAKEN 💀" :
+                   "😴 standing by..."}
                 </p>
                 <button
                   type="button"
                   onClick={handleDisconnect}
-                  className="mt-3 inline-flex rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  className="mt-3 inline-flex rounded-full px-4 py-2 text-sm font-black transition" style={{background:'#cc0000', color:'white', border:'3px solid #000'}}
                 >
-                  Disconnect
+                  💀 KILL KIRK 💀
                 </button>
               </div>
               <AnswerCard inferring={inferring} result={inferenceResult} gamePhase={gamePhase} />
@@ -451,15 +469,15 @@ export default function Home() {
 
         {showErrorPopup && errorMessage ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-3xl border border-red-300 bg-white p-6 shadow-2xl shadow-red-200/50 dark:border-red-700 dark:bg-zinc-950 dark:text-white">
-              <h2 className="text-lg font-semibold text-red-700 dark:text-red-300">Connection Error</h2>
+          <div className="anim-pop-in w-full max-w-md rounded-3xl border border-red-300 bg-white p-6 shadow-2xl shadow-red-200/50 dark:border-red-700 dark:bg-zinc-950 dark:text-white">
+              <h2 className="text-lg font-black" style={{color:'#cc0000'}}>💀 charlie kirk died :( rip 💀</h2>
               <p className="mt-4 text-sm text-zinc-700 dark:text-zinc-300">{errorMessage}</p>
               <button
                 type="button"
                 onClick={() => setShowErrorPopup(false)}
-                className="mt-6 inline-flex rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                className="mt-6 inline-flex rounded-full px-4 py-2 text-sm font-black text-white transition" style={{background:'#cc0000', border:'3px solid #000'}}
               >
-                Dismiss
+                pour one out 🕯️
               </button>
             </div>
           </div>
@@ -469,9 +487,9 @@ export default function Home() {
         {connected && (
           <>
             {/* Kahoot iframe */}
-            <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
-              <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                <span>Kahoot</span>
+            <div className="w-full rounded-3xl border-4 border-blue-600 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #ffff00'}}>
+              <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#0044cc,#0099ff)', color:'white', textShadow:'1px 1px 0 #000'}}>
+                <span>🎮 kahoot battleground 🎮</span>
               </div>
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
                 <iframe
@@ -484,11 +502,11 @@ export default function Home() {
             </div>
 
             {/* Charlie Kirk's eyeballz */}
-            <div className="w-full rounded-3xl border border-zinc-200 bg-white/90 p-4 shadow-xl shadow-zinc-200/40 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:shadow-black/20">
-              <div className="mb-4 flex items-center justify-between rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                <span>Charlie Kirk&apos;s eyeballz</span>
-                <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-900/40 dark:text-green-200">
-                  {cameraActive ? "Active" : "Initializing"}
+            <div className="w-full rounded-3xl border-4 border-green-500 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #cc0000'}}>
+              <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#00aa44,#00ff88)', color:'white', textShadow:'1px 1px 0 #000'}}>
+                <span>👁️ charlie kirk&apos;s eyeballz 👁️</span>
+                <span className="rounded-full px-2 py-1 text-xs font-black" style={{background:'#ffff00', color:'#000', border:'2px solid #000'}}>
+                  {cameraActive ? "👁️ WATCHING" : "💤 booting up"}
                 </span>
               </div>
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
@@ -501,7 +519,7 @@ export default function Home() {
                 />
               </div>
               <div className="mt-3 flex items-center gap-3">
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 w-16 shrink-0">Zoom {cameraZoom.toFixed(1)}×</span>
+                <span className="text-xs font-black w-20 shrink-0" style={{color:'#cc0000'}}>🔍 {cameraZoom.toFixed(1)}× ZOOM</span>
                 <input
                   type="range"
                   min={1}

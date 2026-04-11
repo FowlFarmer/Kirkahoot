@@ -24,3 +24,74 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes wobble {
+  0%   { transform: rotate(-3deg) scale(1.02); }
+  25%  { transform: rotate(3deg) scale(0.98); }
+  50%  { transform: rotate(-2deg) scale(1.03); }
+  75%  { transform: rotate(2deg) scale(0.97); }
+  100% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@keyframes bounceTitle {
+  0%, 100% { transform: rotate(-2deg) translateY(0px) scale(1); }
+  30%       { transform: rotate(2deg) translateY(-10px) scale(1.05); }
+  60%       { transform: rotate(-1deg) translateY(-4px) scale(1.02); }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes rainbowBg {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes jelly {
+  0%, 100% { transform: scaleX(1)   scaleY(1); }
+  25%       { transform: scaleX(1.1) scaleY(0.9); }
+  50%       { transform: scaleX(0.9) scaleY(1.1); }
+  75%       { transform: scaleX(1.05) scaleY(0.95); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px) rotate(-2deg); }
+  40%       { transform: translateX(6px) rotate(2deg); }
+  60%       { transform: translateX(-4px) rotate(-1deg); }
+  80%       { transform: translateX(4px) rotate(1deg); }
+}
+
+@keyframes flashBorder {
+  0%, 100% { border-color: #cc0000; box-shadow: 8px 8px 0 #ffff00, 12px 12px 0 #cc0000; }
+  33%       { border-color: #00aa44; box-shadow: 8px 8px 0 #00ff88, 12px 12px 0 #0044cc; }
+  66%       { border-color: #0044cc; box-shadow: 8px 8px 0 #ff6600, 12px 12px 0 #cc00cc; }
+}
+
+@keyframes kirkSpin {
+  0%   { transform: rotate(0deg) scale(1); border-radius: 50%; }
+  25%  { transform: rotate(10deg) scale(1.08); border-radius: 40%; }
+  50%  { transform: rotate(0deg) scale(1); border-radius: 50%; }
+  75%  { transform: rotate(-10deg) scale(1.08); border-radius: 40%; }
+  100% { transform: rotate(0deg) scale(1); border-radius: 50%; }
+}
+
+@keyframes popIn {
+  0%   { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  70%  { transform: scale(1.1) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.anim-wobble       { animation: wobble 2.5s ease-in-out infinite; }
+.anim-bounce-title { animation: bounceTitle 3s ease-in-out infinite; }
+.anim-rainbow-btn  { background-size: 300% 300% !important; animation: rainbowBg 2s linear infinite; }
+.anim-jelly        { animation: jelly 1.8s ease-in-out infinite; }
+.anim-shake        { animation: shake 0.6s ease-in-out infinite; }
+.anim-flash-border { animation: flashBorder 2s linear infinite; }
+.anim-kirk         { animation: kirkSpin 5s ease-in-out infinite; }
+.anim-pop-in       { animation: popIn 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+.anim-pulse-slow   { animation: pulse 1.5s ease-in-out infinite; }
+
