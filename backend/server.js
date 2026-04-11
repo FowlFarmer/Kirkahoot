@@ -35,6 +35,7 @@ const errorLog = (...args) => {
 
 let browser = null;
 const sessions = new Map();
+const MAX_ACTIVE_SESSIONS = Number(process.env.MAX_ACTIVE_SESSIONS) || 4;
 
 const startSessionCountLog = () => {
   setInterval(() => {
@@ -342,6 +343,17 @@ wss.on("connection", (socket) => {
   log("WebSocket connection opened");
   if (!browser) {
     socket.send(JSON.stringify({ type: "status", message: "backend unavailable" }));
+    socket.close();
+    return;
+  }
+
+  if (sessions.size >= MAX_ACTIVE_SESSIONS) {
+    socket.send(
+      JSON.stringify({
+        type: "error",
+        message: `Maximum active sessions reached (${MAX_ACTIVE_SESSIONS}). Please try again later.`,
+      })
+    );
     socket.close();
     return;
   }
