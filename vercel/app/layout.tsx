@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "lowkirkhootenuinsplainin'",
-  description: "Charlie Kirk plays Kahoot so you don't have to",
+  description: "Charlie Kirk plays Kahoot so you don't have to!",
 };
 
 export default function RootLayout({
