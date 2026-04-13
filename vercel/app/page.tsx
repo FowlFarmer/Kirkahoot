@@ -159,7 +159,7 @@ function WonkyTitle() {
   };
 
   return (
-    <h1 className="anim-bounce-title text-center text-4xl font-black tracking-tight select-none pb-5"
+    <h1 className="anim-bounce-title text-center text-3xl sm:text-4xl font-black tracking-tight select-none pb-5 w-full overflow-hidden"
       style={{lineHeight: 1.2}}>
       {TITLE_PARTS.map((p, i) => (
         <span key={i} style={partStyle(i)}>
@@ -217,6 +217,7 @@ export default function Home() {
   const [inferenceResult, setInferenceResult] = useState<string | null>(null);
   const [inferring, setInferring] = useState(false);
   const [cameraZoom, setCameraZoom] = useState(1);
+  const [facingMode, setFacingMode] = useState<"user"|"environment">("environment");
   const [lastCaptureUrl, setLastCaptureUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
@@ -238,7 +239,7 @@ export default function Home() {
     let stopped = false;
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
         if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -263,7 +264,7 @@ export default function Home() {
       setCameraActive(false);
       setCameraError(null);
     };
-  }, [connected]);
+  }, [connected, facingMode]);
 
   useEffect(() => {
     return () => {
@@ -493,12 +494,12 @@ export default function Home() {
             🌐 tzhu.dev
           </a>
         </div>
-        <p className="text-center text-xs font-bold uppercase tracking-widest" style={{color:'#0000cc'}}>⚠️ WARNING: contains based AI 🦅 conservative Kahoot domination ⚠️</p>
+        <p className="text-center text-xs font-bold uppercase tracking-widest rounded-xl px-3 py-2" style={{color:'#0000cc', background:'rgba(255,255,255,0.85)'}}>⚠️ WARNING: contains based AI 🦅 conservative Kahoot domination ⚠️</p>
 
         {/* Charlie Kirk's Den */}
         <div className="anim-flash-border w-full rounded-3xl border-4 border-red-500 bg-white/95 p-6 shadow-2xl">
-          <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#cc0000,#ff6600,#ffcc00)', color:'white', textShadow:'1px 1px 0 #000'}}>
-            <span>🦅 lowkirkhootenuinsplainin&apos; 🦅</span>
+          <div className="mb-4 flex flex-wrap items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs sm:text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#cc0000,#ff6600,#ffcc00)', color:'white', textShadow:'1px 1px 0 #000'}}>
+            <span className="w-full text-center sm:w-auto sm:flex-1">🦅 lowkirkhootenuinsplainin&apos; 🦅</span>
             {connected && (
               <span className="rounded-full px-2 py-1 text-xs font-black" style={{background:'#00ff88', color:'#000', border:'2px solid #000'}}>
                 🟢 {streamStatus}
@@ -552,13 +553,15 @@ export default function Home() {
                        gamePhase === "incorrect" ? "💀 L TAKEN 💀" :
                        "😴 standing by..."}
                     </p>
+                    <div className="mt-3 flex justify-center sm:justify-start">
                     <button
                       type="button"
                       onClick={handleDisconnect}
-                      className="mt-3 inline-flex rounded-full px-4 py-2 text-sm font-black transition" style={{background:'#cc0000', color:'white', border:'3px solid #000'}}
+                      className="inline-flex rounded-full px-4 py-2 text-sm font-black transition" style={{background:'#cc0000', color:'white', border:'3px solid #000'}}
                     >
                       💀 KILL KIRK 💀
                     </button>
+                  </div>
                   </div>
                   <div className="w-full flex justify-center sm:w-auto sm:flex-none">
                     <KirkImage phase={gamePhase} inferring={inferring} />
@@ -589,7 +592,7 @@ export default function Home() {
         <div className={connected ? "contents" : "hidden"}>
             {/* Kahoot iframe */}
             <div className="w-full rounded-3xl border-4 border-blue-600 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #ffff00'}}>
-              <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#0044cc,#0099ff)', color:'white', textShadow:'1px 1px 0 #000'}}>
+              <div className="mb-4 flex items-center justify-center rounded-2xl px-4 py-3 text-xs sm:text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#0044cc,#0099ff)', color:'white', textShadow:'1px 1px 0 #000'}}>
                 <span>🎮 kahoot battleground 🎮</span>
               </div>
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black shadow-inner dark:border-zinc-800">
@@ -605,11 +608,20 @@ export default function Home() {
 
             {/* Charlie Kirk's eyeballz */}
             <div className="w-full rounded-3xl border-4 border-green-500 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #cc0000'}}>
-              <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#00aa44,#00ff88)', color:'white', textShadow:'1px 1px 0 #000'}}>
-                <span>👁️ charlie kirk&apos;s eyeballz 👁️</span>
-                <span className="rounded-full px-2 py-1 text-xs font-black" style={{background:'#ffff00', color:'#000', border:'2px solid #000'}}>
-                  {cameraActive ? "👁️ WATCHING" : "💤 booting up"}
-                </span>
+              <div className="mb-4 flex flex-wrap items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs sm:text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#00aa44,#00ff88)', color:'white', textShadow:'1px 1px 0 #000'}}>
+                <span className="w-full text-center sm:w-auto sm:flex-1">👁️ charlie kirk&apos;s eyeballz 👁️</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFacingMode(f => f === "environment" ? "user" : "environment")}
+                    className="rounded-full px-2 py-1 text-xs font-black transition"
+                    style={{background:'#fff', color:'#000', border:'2px solid #000'}}
+                    title="Flip camera"
+                  >🔄 flip</button>
+                  <span className="rounded-full px-2 py-1 text-xs font-black" style={{background:'#ffff00', color:'#000', border:'2px solid #000'}}>
+                    {cameraActive ? "👁️ WATCHING" : "💤 booting up"}
+                  </span>
+                </div>
               </div>
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
                 <video

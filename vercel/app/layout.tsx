@@ -29,9 +29,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       style={{ fontFamily: '"Comic Sans MS", "Comic Sans", cursive' }}
     >
-      <Analytics/>
-      <SpeedInsights/>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics/>
+        <SpeedInsights/>
+      </body>
     </html>
   );
 }
