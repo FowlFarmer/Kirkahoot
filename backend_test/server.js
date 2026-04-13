@@ -6,7 +6,7 @@ import Kahoot from "kahoot.js-latest";
 import crypto from "crypto";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
-const MAX_ACTIVE_SESSIONS = Number(process.env.MAX_ACTIVE_SESSIONS) || 20;
+const MAX_ACTIVE_SESSIONS = Number(process.env.MAX_ACTIVE_SESSIONS) || 80;
 const LOG_INTERVAL_MS = Number(process.env.LOG_INTERVAL_MS) || 10000;
 const ENABLE_LOGS = process.env.ENABLE_BACKEND_LOGS === "true" || process.env.NODE_ENV !== "production";
 
@@ -31,6 +31,28 @@ const warn = (...args) => { if (ENABLE_LOGS) console.warn("[backend_test]", pret
 const errorLog = (...args) => { if (ENABLE_LOGS) console.error("[backend_test]", prettyTime(), ...args); };
 
 const sessions = new Map();
+
+// Simple in-memory IP rate limiter
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 5;
+const rateLimitMap = new Map(); // ip -> { count, resetAt }
+
+const ipRateLimit = (req, res, next) => {
+  const ip = req.socket.remoteAddress ?? "unknown";
+  const now = Date.now();
+  let entry = rateLimitMap.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitMap.set(ip, entry);
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    res.setHeader("Retry-After", retryAfter);
+    return res.status(429).json({ error: "Too many requests. Try again in " + retryAfter + "s." });
+  }
+  next();
+};
 
 // Kahoot answer index → shape name (standard order)
 // 0=triangle(red), 1=diamond(blue), 2=circle(yellow), 3=square(green)
@@ -132,7 +154,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", sessions: sessions.size });
 });
 
-app.post("/click-answer", async (req, res) => {
+app.post("/click-answer", ipRateLimit, async (req, res) => {
   const { sessionId, shape } = req.body ?? {};
 
   if (!sessionId || typeof sessionId !== "string") {
