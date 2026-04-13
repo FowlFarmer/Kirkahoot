@@ -608,9 +608,9 @@ export default function Home() {
 
             {/* Charlie Kirk's eyeballz */}
             <div className="w-full rounded-3xl border-4 border-green-500 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #cc0000'}}>
-              <div className="mb-4 relative flex items-center justify-center rounded-2xl px-4 py-3 text-xs sm:text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#00aa44,#00ff88)', color:'white', textShadow:'1px 1px 0 #000'}}>
+              <div className="mb-4 flex flex-col sm:flex-row sm:relative sm:items-center sm:justify-center gap-2 rounded-2xl px-4 py-3 text-xs sm:text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#00aa44,#00ff88)', color:'white', textShadow:'1px 1px 0 #000'}}>
                 <span className="text-center">👁️ charlie kirk&apos;s eyeballz 👁️</span>
-                <div className="absolute right-3 flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 sm:absolute sm:right-3">
                   <button
                     type="button"
                     onClick={() => setFacingMode(f => f === "environment" ? "user" : "environment")}
