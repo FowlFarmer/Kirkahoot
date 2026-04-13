@@ -623,11 +623,11 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
+              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800" style={{aspectRatio:'4/3'}}>
                 <video
                   tabIndex={-1}
                   ref={videoRef}
-                  className="h-[320px] w-full object-cover transition-transform duration-150"
+                  className="w-full h-full object-cover transition-transform duration-150"
                   style={{ transform: `scale(${cameraZoom})` }}
                   playsInline
                   muted
