@@ -475,8 +475,7 @@ export default function Home() {
             )}
           </div>
 
-          {!connected ? (
-            <div className="space-y-5">
+          <div className={connected ? "hidden" : "space-y-5"}>
               {/* Kirk portrait */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -510,8 +509,8 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-4">
+
+            <div className={connected ? "space-y-4" : "hidden"}>
               <div className="rounded-3xl border-4 border-dashed border-orange-500 p-4 text-sm font-bold" style={{background:'#fffde7'}}>
                 <p className="font-black text-base" style={{color:'#cc0000'}}>🎮 KIRK IS IN THE LOBBY 🎮</p>
                 <p className="mt-2">📌 PIN: <span style={{color:'#0044cc'}}>{pin}</span></p>
@@ -537,7 +536,6 @@ export default function Home() {
               </div>
               <AnswerCard inferring={inferring} result={inferenceResult} gamePhase={gamePhase} />
             </div>
-          )}
         </div>
 
         {showErrorPopup && errorMessage ? (
@@ -556,9 +554,8 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Camera + Kahoot — only shown after connection */}
-        {connected && (
-          <>
+        {/* Camera + Kahoot — always in DOM, hidden until connected */}
+        <div className={connected ? "contents" : "hidden"}>
             {/* Kahoot iframe */}
             <div className="w-full rounded-3xl border-4 border-blue-600 bg-white/95 p-4" style={{boxShadow:'8px 8px 0 #ffff00'}}>
               <div className="mb-4 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black uppercase" style={{background:'linear-gradient(90deg,#0044cc,#0099ff)', color:'white', textShadow:'1px 1px 0 #000'}}>
@@ -585,6 +582,7 @@ export default function Home() {
               </div>
               <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-black dark:border-zinc-800">
                 <video
+                  tabIndex={-1}
                   ref={videoRef}
                   className="h-[320px] w-full object-cover transition-transform duration-150"
                   style={{ transform: `scale(${cameraZoom})` }}
@@ -610,8 +608,7 @@ export default function Home() {
                 </p>
               ) : null}
             </div>
-          </>
-        )}
+        </div>
 
       </div>
     </div>
