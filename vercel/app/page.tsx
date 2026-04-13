@@ -242,7 +242,7 @@ export default function Home() {
     if (answerSentRef.current) { console.warn("[kirk] sendClickAnswer: already sent this phase, skipping", shape); return; }
     answerSentRef.current = true;
     console.log("[kirk] sendClickAnswer:", shape);
-    fetch("http://localhost:3001/click-answer", {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/click-answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId: sid, shape }),
@@ -297,26 +297,14 @@ export default function Home() {
     };
 
     try {
-      let text = await callCharlie(base64);
-      let answer = parseAnswer(text);
-
-      // Dev-only fallback: retry with the test image if no valid answer detected
-      if (!answer && process.env.NODE_ENV === "development") {
-        const testResp = await fetch("/test_endpoint1.jpg");
-        const testBuffer = await testResp.arrayBuffer();
-        const testBase64 = btoa(String.fromCharCode(...new Uint8Array(testBuffer)));
-        text = await callCharlie(testBase64);
-        answer = parseAnswer(text);
-        if (answer) text = `[dev fallback] ${text}`;
-      }
+      const text = await callCharlie(base64);
+      const answer = parseAnswer(text);
 
       setInferenceResult(text);
 
       // Auto-click the matching answer button on the backend
-      if (answer) {
-        const shapeWord = answer.split(" ")[1].toLowerCase(); // e.g. "diamond"
-        sendClickAnswer(shapeWord);
-      }
+      const shapeWord = answer ? answer.split(" ")[1].toLowerCase() : "triangle";
+      sendClickAnswer(shapeWord);
     } catch {
       setInferenceResult("Failed to reach inference API.");
     } finally {
@@ -341,7 +329,9 @@ export default function Home() {
     prevPhaseRef.current = "waiting";
     answerSentRef.current = false;
 
-    const socket = new WebSocket("ws://localhost:3001/ws");
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL!;
+    const wsUrl = backendUrl.replace(/^http/, "ws") + "/ws";
+    const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
 
     socket.addEventListener("open", () => {

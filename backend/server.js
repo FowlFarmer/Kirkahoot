@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
@@ -32,7 +33,13 @@ const sessions = new Map();
 const MAX_ACTIVE_SESSIONS = Number(process.env.MAX_ACTIVE_SESSIONS) || 4;
 
 const startSessionCountLog = () => {
-  setInterval(() => log("Active backend sessions:", sessions.size), 10000);
+  const interval = Number(process.env.LOG_INTERVAL_MS) || 10000;
+  setInterval(() => {
+    const mem = process.memoryUsage();
+    const rss = (mem.rss / 1024 / 1024).toFixed(1);
+    const heap = (mem.heapUsed / 1024 / 1024).toFixed(1);
+    log(`Active sessions: ${sessions.size} | RAM rss=${rss}MB heap=${heap}MB`);
+  }, interval);
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,18 +91,27 @@ const createSession = async (socket, pin) => {
 
   try {
     await page.setViewport({ width: 1280, height: 900 });
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (type === "image" || type === "font" || type === "media") {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
     if (typeof page.waitForNetworkIdle === "function") {
       await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
     }
 
-    await sleep(690);
+    await sleep(69);
     const nicknameSelector = 'input[name="nickname"], #nickname, input[data-functional-selector="username-input"]';
     await page.waitForSelector(nicknameSelector, { timeout: 10000 });
     await page.type(nicknameSelector, nickname, { delay: 50 });
     log("Nickname typed", nickname);
 
-    await sleep(670);
+    await sleep(67);
     const submitSelector = 'button[data-functional-selector="join-button-username"], button[type="submit"]';
     await page.waitForSelector(submitSelector, { timeout: 10000 });
     await page.click(submitSelector);
@@ -163,7 +179,7 @@ const createSession = async (socket, pin) => {
     } catch (err) {
       await killSession(sessionId, err);
     }
-  }, 800);
+  }, 500);
 
   const hardTimeout = setTimeout(async () => {
     log("Hard timeout reached", sessionId);
@@ -212,7 +228,28 @@ const startBrowser = async () => {
     browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-sync",
+        "--disable-translate",
+        "--disable-default-apps",
+        "--no-first-run",
+        "--mute-audio",
+        "--js-flags=--max-old-space-size=128",
+      ],
+    });
+    browser.on("disconnected", async () => {
+      warn("Browser disconnected — killing all sessions and restarting...");
+      browser = null;
+      for (const sessionId of Array.from(sessions.keys())) {
+        await killSession(sessionId, "browser crashed").catch(() => {});
+      }
+      startBrowser().catch((err) => errorLog("Browser restart failed:", err));
     });
     log("Puppeteer browser launched");
   } catch (error) {
