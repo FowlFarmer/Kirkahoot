@@ -221,8 +221,8 @@ wss.on("connection", (socket) => {
         if (initialized) return;
 
         const pin = String(data.pin || "").trim();
-        if (!/^\d{7}$/.test(pin)) {
-          socket.send(JSON.stringify({ type: "error", message: "pin must be a 7-digit number" }));
+        if (!/^\d{1,9}$/.test(pin)) {
+          socket.send(JSON.stringify({ type: "error", message: "pin must be 1-9 digits" }));
           return;
         }
 
