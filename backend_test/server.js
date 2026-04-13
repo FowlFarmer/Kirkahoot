@@ -50,6 +50,7 @@ const createSession = async (socket, pin) => {
   const client = new Kahoot();
   let pendingQuestion = null;
   let inAnsweringPhase = false;
+  let seenFirstQuestionReady = false;
   let hardTimeout = null;
 
   const send = (obj) => {
@@ -72,12 +73,17 @@ const createSession = async (socket, pin) => {
 
   client.on("QuestionReady", () => {
     log("QuestionReady", sessionId);
+    seenFirstQuestionReady = true;
     inAnsweringPhase = false;
     pendingQuestion = null;
     send({ type: "phase", phase: "waiting" });
   });
 
   client.on("QuestionStart", (question) => {
+    if (!seenFirstQuestionReady) {
+      log("QuestionStart ignored — joined mid-question, waiting for next cycle", sessionId);
+      return;
+    }
     log("QuestionStart", sessionId);
     pendingQuestion = question;
     inAnsweringPhase = true;

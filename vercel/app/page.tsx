@@ -194,6 +194,17 @@ export default function Home() {
   const [cameraZoom, setCameraZoom] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const savedScrollRef = useRef(0);
+
+  // When `connected` becomes true the iframe + camera mount — lock scroll position
+  useEffect(() => {
+    if (connected) {
+      const saved = savedScrollRef.current;
+      // Defer so the DOM has painted before we restore
+      const raf = requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: "instant" }));
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [connected]);
 
   useEffect(() => {
     if (!connected) return;
@@ -322,6 +333,7 @@ export default function Home() {
     }
 
     setConnecting(true);
+    savedScrollRef.current = window.scrollY;
     setStreamStatus("Connecting");
     setStatusMessage("Attempting to connect to the Kahoot game...");
     setInferenceResult(null);
@@ -557,6 +569,7 @@ export default function Home() {
                   ref={kahootIframeRef}
                   src="https://kahoot.it"
                   title="Kahoot"
+                  tabIndex={-1}
                   className="h-[520px] w-full min-w-[320px] bg-white"
                 />
               </div>
