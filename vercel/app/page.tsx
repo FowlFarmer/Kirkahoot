@@ -389,7 +389,7 @@ export default function Home() {
         const nowPhase: string = data.phase ?? "waiting";
         if (nowPhase === "answering" && prevPhaseRef.current !== "answering") {
           answerSentRef.current = false;
-          captureAndInfer();
+          setTimeout(() => captureAndInfer(), 700);
         }
         prevPhaseRef.current = nowPhase;
         setGamePhase(nowPhase as "waiting"|"answering"|"correct"|"incorrect");
