@@ -140,7 +140,7 @@ function WonkyTitle() {
     const squishing = squishA || squishB;
     return {
       display: "inline-block",
-      whiteSpace: "nowrap",
+      whiteSpace: spread ? "nowrap" : "normal",
       color: spread ? p.color : "#cc0000",
       transform: squishing
         ? `scaleY(0.12) rotate(0deg)`
@@ -159,8 +159,8 @@ function WonkyTitle() {
   };
 
   return (
-    <h1 className="anim-bounce-title text-center text-3xl sm:text-4xl font-black tracking-tight select-none w-full overflow-hidden"
-      style={{lineHeight: 1.2, height: '5rem', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+    <h1 className="anim-bounce-title text-center text-3xl sm:text-4xl font-black tracking-tight select-none w-full"
+      style={{lineHeight: 1.3, minHeight: '5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
       {TITLE_PARTS.map((p, i) => (
         <span key={i} style={partStyle(i)}>
           {phase >= 1 ? p.origin : p.text}
