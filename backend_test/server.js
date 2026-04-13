@@ -125,8 +125,17 @@ const createSession = async (socket, pin) => {
   });
 
   client.on("QuizEnd", () => {
-    log("QuizEnd", sessionId);
-    send({ type: "status", message: "Quiz ended." });
+    log("QuizEnd — host ended game, killing session", sessionId);
+    send({ type: "error", message: "the host ended the game 💀 kirk is homeless now" });
+    socket.close();
+    cleanup();
+  });
+
+  client.on("GameReset", () => {
+    log("GameReset — host reset/kicked everyone, killing session", sessionId);
+    send({ type: "error", message: "host reset the game and kicked everyone 💀 rip kirk" });
+    socket.close();
+    cleanup();
   });
 
   client.on("Disconnect", (reason) => {

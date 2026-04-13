@@ -170,6 +170,31 @@ function WonkyTitle() {
   );
 }
 
+// ── Kirk mood image ───────────────────────────────────────────────────────────
+
+const PHASE_IMAGES: Record<string, string[]> = {
+  waiting:   ["/kirkpie.jpg"],
+  answering: ["/kirkhappy1.jpg", "/kirkhappy2.jpg", "/kirkhappy3.jpg"],
+  correct:   ["/kirkhappy1.jpg", "/kirkhappy2.jpg", "/kirkhappy3.jpg"],
+  incorrect: ["/kirksad1.jpg", "/kirksad2.jpg"],
+};
+
+function KirkImage({ phase, inferring }: { phase: string; inferring: boolean }) {
+  const effectivePhase = inferring ? "answering" : phase;
+  const pool = PHASE_IMAGES[effectivePhase] ?? PHASE_IMAGES.waiting;
+  const src = pool[Math.floor(Math.random() * pool.length)];
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      key={src + effectivePhase}
+      src={src}
+      alt="Charlie Kirk"
+      className="anim-kirk mx-auto object-cover shadow-lg"
+      style={{ borderRadius: "50%", width: "clamp(80px,20vw,140px)", height: "clamp(80px,20vw,140px)" }}
+    />
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -192,6 +217,7 @@ export default function Home() {
   const [inferenceResult, setInferenceResult] = useState<string | null>(null);
   const [inferring, setInferring] = useState(false);
   const [cameraZoom, setCameraZoom] = useState(1);
+  const [lastCaptureUrl, setLastCaptureUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const savedScrollRef = useRef(0);
@@ -267,16 +293,20 @@ export default function Home() {
     const canvas = document.createElement("canvas");
     const vw = video.videoWidth || 640;
     const vh = video.videoHeight || 480;
-    // Center-crop by zoom factor so the output resolution stays constant
+    // Center-crop by zoom factor
     const srcW = vw / cameraZoom;
     const srcH = vh / cameraZoom;
     const srcX = (vw - srcW) / 2;
     const srcY = (vh - srcH) / 2;
-    canvas.width = vw;
-    canvas.height = vh;
+    // Force 4:3 output canvas
+    const outH = Math.round(srcW * (3 / 4));
+    canvas.width = Math.round(srcW);
+    canvas.height = outH;
+    const cropSrcH = Math.min(srcH, srcW * (3 / 4));
+    const cropSrcY = srcY + (srcH - cropSrcH) / 2;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, srcX, cropSrcY, srcW, cropSrcH, 0, 0, canvas.width, canvas.height);
 
     // Compress to JPEG, reducing quality until decoded size <= 80 KB
     const MAX_BYTES = 80 * 1024;
@@ -294,6 +324,7 @@ export default function Home() {
       return;
     }
 
+    setLastCaptureUrl(dataUrl);
     setInferring(true);
     setInferenceResult(null);
 
@@ -323,12 +354,12 @@ export default function Home() {
     }
   };
 
-  const validatePin = (value: string) => /^\d{7}$/.test(value);
+  const validatePin = (value: string) => /^\d{1,9}$/.test(value);
 
   const handleConnect = () => {
     if (connected || connecting) return;
     if (!validatePin(pin)) {
-      setStatusMessage("PIN must be exactly 7 digits.");
+      setStatusMessage("PIN must be 1-9 digits.");
       return;
     }
 
@@ -476,14 +507,7 @@ export default function Home() {
           </div>
 
           <div className={connected ? "hidden" : "space-y-5"}>
-              {/* Kirk portrait */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/kirkpie.png"
-                alt="Charlie Kirk"
-                className="anim-kirk mx-auto h-40 w-40 object-cover shadow-lg"
-                style={{borderRadius:'50%'}}
-              />
+              <KirkImage phase="waiting" inferring={false} />
               <p className="text-center text-sm leading-relaxed font-bold max-w-sm mx-auto" style={{color:'#cc0000'}}>
                 Enter your game PIN and Charlie Kirk will crash this bih type shi, when a question drops, dis YN's
                 be seeing thru yo camera n' picks the answer, n
@@ -493,11 +517,11 @@ export default function Home() {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <input
                   inputMode="numeric"
-                  maxLength={7}
+                  maxLength={9}
                   value={pin}
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 7))}
+                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 9))}
                   className="w-48 rounded-2xl px-4 py-3 text-sm outline-none font-bold" style={{border:'3px solid #cc0000', background:'#fffde7', color:'#000'}}
-                  placeholder="Game PIN (7 digits)"
+                  placeholder="Game PIN"
                 />
                 <button
                   type="button"
@@ -512,27 +536,34 @@ export default function Home() {
 
             <div className={connected ? "space-y-4" : "hidden"}>
               <div className="rounded-3xl border-4 border-dashed border-orange-500 p-4 text-sm font-bold" style={{background:'#fffde7'}}>
-                <p className="font-black text-base" style={{color:'#cc0000'}}>🎮 KIRK IS IN THE LOBBY 🎮</p>
-                <p className="mt-2">📌 PIN: <span style={{color:'#0044cc'}}>{pin}</span></p>
-                <p className="mt-1">🤠 nickname: <span style={{color:'#cc0000'}}>{connectedNickname ?? "—"}</span></p>
-                <p className={`mt-2 text-base font-black`} style={{color:
-                  gamePhase === "answering" ? "#00aa44" :
-                  gamePhase === "correct" ? "#00aa44" :
-                  gamePhase === "incorrect" ? "#cc0000" :
-                  "#888"
-                }}>
-                  {gamePhase === "answering" ? "🔥 ANSWERING RN 🔥" :
-                   gamePhase === "correct" ? "✅ W SECURED ✅" :
-                   gamePhase === "incorrect" ? "💀 L TAKEN 💀" :
-                   "😴 standing by..."}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleDisconnect}
-                  className="mt-3 inline-flex rounded-full px-4 py-2 text-sm font-black transition" style={{background:'#cc0000', color:'white', border:'3px solid #000'}}
-                >
-                  💀 KILL KIRK 💀
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-base" style={{color:'#cc0000'}}>🎮 KIRK IS IN THE LOBBY 🎮</p>
+                    <p className="mt-2">📌 PIN: <span style={{color:'#0044cc'}}>{pin}</span></p>
+                    <p className="mt-1">🤠 nickname: <span style={{color:'#cc0000'}}>{connectedNickname ?? "—"}</span></p>
+                    <p className={`mt-2 text-base font-black`} style={{color:
+                      gamePhase === "answering" ? "#00aa44" :
+                      gamePhase === "correct" ? "#00aa44" :
+                      gamePhase === "incorrect" ? "#cc0000" :
+                      "#888"
+                    }}>
+                      {gamePhase === "answering" ? "🔥 ANSWERING RN 🔥" :
+                       gamePhase === "correct" ? "✅ W SECURED ✅" :
+                       gamePhase === "incorrect" ? "💀 L TAKEN 💀" :
+                       "😴 standing by..."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      className="mt-3 inline-flex rounded-full px-4 py-2 text-sm font-black transition" style={{background:'#cc0000', color:'white', border:'3px solid #000'}}
+                    >
+                      💀 KILL KIRK 💀
+                    </button>
+                  </div>
+                  <div className="w-full flex justify-center sm:w-auto sm:flex-none">
+                    <KirkImage phase={gamePhase} inferring={inferring} />
+                  </div>
+                </div>
               </div>
               <AnswerCard inferring={inferring} result={inferenceResult} gamePhase={gamePhase} />
             </div>
@@ -606,6 +637,13 @@ export default function Home() {
                 <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/40 dark:text-red-200">
                   {cameraError}
                 </p>
+              ) : null}
+              {lastCaptureUrl ? (
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-black uppercase tracking-widest" style={{color:'#cc0000'}}>📸 last sent to kirk brain</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={lastCaptureUrl} alt="last capture" className="w-full rounded-2xl border-2 border-dashed border-orange-400" style={{aspectRatio:'4/3', objectFit:'cover'}} />
+                </div>
               ) : null}
             </div>
         </div>
